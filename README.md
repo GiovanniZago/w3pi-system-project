@@ -1,6 +1,6 @@
 # System Project Test on VCK5000
 
-This repository is meant to provide a standard, bare-metal setup to work with the **AMD VCK5000 Versal Development Card** following the Vitis Toolkit Workflow. 
+This repository is meant to provide a standard, bare-metal setup for a System Project that targets the **AMD VCK5000 Versal Development Card** by using the Vitis Tools Workflow. A System Project combines **kernels** that run on the Programmable Logic (PL), the AI Engine Array and the Processing System (PS) of the board. 
 
 The suggested directory tree structure is the following, in which there are also reported all the files needed to run a **hardware emulation** of the system project. Some of them must be provided (P) while others are automatically generated (G) when running the Vitis commands. 
 
