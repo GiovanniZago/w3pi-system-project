@@ -1,0 +1,23 @@
+# exclude folders
+/.vscode
+/__pycache__
+/link
+/package
+/hw-emu
+**/hw
+**/x86
+*.hdf5
+**/_x
+**/.Xil
+
+# exclude file formats
+*.xo
+*.log
+*.compile_summary
+*.out
+
+# exclude scripts and specific files
+data_generator.py
+config.py
+playground.cpp
+playground.o
