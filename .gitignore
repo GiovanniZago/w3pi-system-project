@@ -1,9 +1,9 @@
 # exclude folders
 /.vscode
 /__pycache__
-/link
+link/*
 /package
-/hw-emu
+hw-emu/*
 **/hw
 **/x86
 *.hdf5
@@ -21,3 +21,7 @@ data_generator.py
 config.py
 playground.cpp
 playground.o
+
+# allow only specific files
+!link/system.cfg
+!hw-emu/xrt.ini
