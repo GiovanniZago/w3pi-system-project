@@ -4,11 +4,14 @@
 link/*
 /package
 hw-emu/*
+hw-run/*
+data/
 **/hw
 **/x86
 *.hdf5
 **/_x
 **/.Xil
+**/proj
 
 # exclude file formats
 *.xo

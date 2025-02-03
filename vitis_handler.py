@@ -5,7 +5,7 @@ import subprocess
 import config
 
 def get_xilinx_environment():
-    command = "bash -c 'source " + config.XILINX_SETUP + " && env'"
+    command = f'bash -c "source {config.XILINX_SETUP} && env"'
     result = subprocess.run(command, capture_output=True, text=True, shell=True)
 
     env = {}
@@ -113,7 +113,7 @@ def hls_compile(env, kernel_name):
                     "-g", # debug flag
                     "-c", # compile flag
                     "-t", 
-                    "hw_emu", 
+                    config.TARGET, 
                     "--platform", 
                     f"{config.XILINX_VCK5000_GEN4X8_XDMA}",
                     "-k",
@@ -130,7 +130,7 @@ def link_system(env):
                     "-g", # debug flag
                     "-l", # link flag
                     "-t", 
-                    "hw_emu", 
+                    config.TARGET, 
                     "--platform", 
                     f"{config.XILINX_VCK5000_GEN4X8_XDMA}", 
                     f"{config.HLS}/mm2s.hw_emu.xo", 
@@ -152,9 +152,10 @@ def package_system(env):
                     "-g", # debug flag
                     "-p", # package flag
                     "-t",
-                    "hw_emu", 
+                    config.TARGET, 
                     "--platform", 
-                    f"{config.XILINX_VCK5000_GEN4X8_XDMA}", 
+                    config.XILINX_VCK5000_GEN4X8_XDMA, 
+                    "--package.boot_mode=ospi",
                     f"{config.LINK}/out.xsa", 
                     f"{config.AIE_HW}/libadf.a", 
                     "-o", 
@@ -164,6 +165,8 @@ def package_system(env):
 def sw_compile(env):
     os.chdir(config.SW)
 
+    exec_path = config.HW_EMU if config.TARGET == "hw_emu" else config.HW_RUN
+
     subprocess.run(["g++", 
                     "-std=c++17", 
                     "-g", # debug flag
@@ -171,7 +174,7 @@ def sw_compile(env):
                     "-I./", 
                     f"host.cpp", 
                     "-o", 
-                    f"{config.HW_EMU}/host.o", 
+                    f"{exec_path}/host.o", 
                     f"-L{config.XRT_LIB}", 
                     "-lxrt_coreutil", 
                     "-pthread"],
@@ -191,6 +194,13 @@ def run_hw_emu(env):
                     f"{config.PACKAGE}/output.xclbin"],
                     env=env)
     
+def run_hw(env):
+    os.chdir(config.HW_RUN)
+
+    subprocess.run(["./host.o",
+                    f"{config.PACKAGE}/output.xclbin"],
+                    env=env)
+    
 if __name__ == "__main__":
     env = get_xilinx_environment()
 
@@ -204,7 +214,7 @@ if __name__ == "__main__":
     # aie_compile_hw(env)
     # run_aiesimulator(env)
 
-    # hls_compile(env, "mm2s")
+    hls_compile(env, "mm2s")
     # hls_compile(env, "s2mm")
 
     # link_system(env)
@@ -213,4 +223,6 @@ if __name__ == "__main__":
 
     # sw_compile(env)
 
-    run_hw_emu(env)
+    # run_hw_emu(env)
+
+    # run_hw(env)
