@@ -5,7 +5,8 @@
 #include <hls_stream.h>
 #include <ap_axi_sdata.h>
 
-#define EV_SIZE = 224
+#define EV_SIZE 224
+#define N_ITER  EV_SIZE / 2
 
 extern "C" 
 {

@@ -7,17 +7,18 @@ import numpy as np
 import uproot
 import awkward as ak
 from tqdm import tqdm
+import config
 
 class PuppiData:
     line_size = 8 # each line is 8 bytes
-    data_path = "/home/giovanni/pod/thesis/code/scripts-sources/W3Pi-selection-algorithm/data/"
+    data_path = config.DATA
     head_columns = ["idx", "vld_header", "err_bit", "lr_number", "orbit_cnt", "bx_cnt", "n_cand"]
     part_columns = ["idx", "pdg_id", "phi", "eta", "pt"]
 
 
     def __init__(self, file_name):
         self.file_name = file_name
-        self.file_path = self.data_path + file_name
+        self.file_path = self.data_path + "/" + file_name
         file_stats = os.stat(self.file_path)
         self.file_size = file_stats.st_size # file size in Bytes
         self.file_rows = int(self.file_size / self.line_size) # each row has line_size Bytes
@@ -69,7 +70,7 @@ class PuppiData:
         for idx, line_str in zip(list(range(idx_start, idx_end)), lines_str):
             header = self._unpack_header(line_str)
 
-            if (int.from_bytes(line_str) == 0): 
+            if (int.from_bytes(line_str, sys.byteorder) == 0): 
                 is_null = True
             else:
                 is_null = False
@@ -387,34 +388,33 @@ class PuppiData:
                 eta += 2 ** ii
 
         eta += (-1) * eta_sign * 2 ** (12 - 1)
+        
+        if pid == 0:
+            pdg_id = 130
 
-        match pid:
-            case 0: # 000
-                pdg_id = 130
+        elif pid == 1:
+            pdg_id = 22
 
-            case 1: # 001
-                pdg_id = 22
+        elif pid == 2:
+            pdg_id = -211
 
-            case 2: # 010
-                pdg_id = -211
+        elif pid == 3:
+            pdg_id = 211
 
-            case 3: # 011
-                pdg_id = 211
+        elif pid == 4:
+            pdg_id = 11
 
-            case 4: # 100
-                pdg_id = 11
+        elif pid == 5:
+            pdg_id = -11
 
-            case 5: # 101
-                pdg_id = -11
+        elif pid == 6:
+            pdg_id = 6
 
-            case 6: # 110
-                pdg_id = 13
+        elif pid == 7:
+            pdg_id = -13
 
-            case 7: # 111
-                pdg_id = -13
-
-            case _:
-                pdg_id = "ERR"
+        else:
+            pdg_id = "ERR"
 
         return {
             "pdg_id": pdg_id, 
@@ -424,30 +424,32 @@ class PuppiData:
         }
     
     def _get_raw_pdgid(self, pdg_id):
-        match pdg_id:
-            case 130:
-                return 0
+        if pdg_id == 130:
+            return 0
+    
+        elif pdg_id == 22:
+            return 1
 
-            case 22:
-                return 1
+        elif pdg_id == -211:
+            return 2
+        
+        elif pdg_id == 211:
+            return 3
+        
+        elif pdg_id == 11:
+            return 4
+        
+        elif pdg_id == -11:
+            return 5
+        
+        elif pdg_id == 13:
+            return 6
 
-            case -211:
-                return 2
-
-            case 211:
-                return 3
-
-            case 11:
-                return 4
-
-            case -11:
-                return 5
-
-            case 13:
-                return 6
-
-            case -13:
-                return 7
+        elif pdg_id == -13:
+            return 7
+        
+        else:
+            return "ERR"
     
 if __name__ == "__main__":
     # file = "Puppi.dump"
@@ -457,4 +459,4 @@ if __name__ == "__main__":
     # file = "puppi_WTo3Pion_PU200.dump"
     file = "PuppiSignal_224.dump"
     with PuppiData(file) as myPuppi:
-        myPuppi.to_aiecsv64_unpacked()
+        myPuppi.print_lines_data(0, 224)
