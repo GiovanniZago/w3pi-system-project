@@ -7,17 +7,16 @@
 
 using namespace adf;
 
-void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16> * __restrict out0, output_stream<int16> * __restrict out1)
+void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
 {   
     // data variables
-    int64 data; 
     aie::vector<int16, V_SIZE> pts[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
     aie::vector<int16, V_SIZE> etas[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
     aie::vector<int16, V_SIZE> phis[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) }; 
     aie::vector<int16, V_SIZE> pdg_ids[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
 
     // filter pt and pdg id
-    bool is_min_pt, is_med_pt, is_hig_pt, is_pdg_id;
+    aie::mask<V_SIZE> is_min_pt[P_BUNCHES], is_med_pt[P_BUNCHES], is_hig_pt[P_BUNCHES], is_pdg_id[P_BUNCHES];
     int16 min_pt_counter=0, med_pt_counter=0, hig_pt_counter=0;
     aie::vector<int16, N_MIN> is_filter = aie::broadcast<int16, N_MIN>(0);
     int16 is_filter_idx=0;
@@ -28,13 +27,22 @@ void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16>
     for (int i=0; i<P_BUNCHES; i++)
     {
         pts[i] = readincr_v<V_SIZE>(in0);
+        is_min_pt[i] = aie::geq(pts[i], MIN_PT);
+        is_med_pt[i] = aie::geq(pts[i], MED_PT);
+        is_hig_pt[i] = aie::geq(pts[i], HIG_PT);
+        min_pt_counter += is_min_pt[i].count();
+        med_pt_counter += is_med_pt[i].count();
+        hig_pt_counter += is_hig_pt[i].count();
+
         etas[i] = readincr_v<V_SIZE>(in1);
     }
 
     for (int i=0; i<P_BUNCHES; i++)
     {
         phis[i] = readincr_v<V_SIZE>(in0);
+
         pdg_ids[i] = readincr_v<V_SIZE>(in1);
+        is_pdg_id[i] = aie::geq(ptg_ids[i], 2);
     }
 
     bool skip_event = false;
@@ -96,25 +104,6 @@ void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16>
             is_iso_filter[i] = is_filter[i];
         }
     }
-
-    writeincr(out0, pts_iso_filter);    
-    writeincr(out1, etas_iso_filter);    
-    writeincr(out0, phis_iso_filter);    
-    writeincr(out1, pdg_ids_iso_filter);    
-    writeincr(out0, is_iso_filter);    
-}
-
-void combinatorial(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
-{
-    // data variables
-    aie::vector<int16, N_MIN> pts_iso_filter, etas_iso_filter, phis_iso_filter, pdg_ids_iso_filter, is_iso_filter;
-
-    // READ DATA 
-    pts_iso_filter = readincr_v<N_MIN>(in0);
-    etas_iso_filter = readincr_v<N_MIN>(in1);
-    phis_iso_filter = readincr_v<N_MIN>(in0);
-    pdg_ids_iso_filter = readincr_v<N_MIN>(in1);
-    is_iso_filter = readincr_v<N_MIN>(in0);
 
     // ang sep specific variables
     int16 d_eta, d_phi;

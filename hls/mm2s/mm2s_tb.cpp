@@ -4,11 +4,9 @@
 #include "ap_int.h"
 #include "src/mm2s.h"
 
-#define EV_SIZE 224
-
 int main() 
 {
-    ap_int<64> mem[EV_SIZE];
+    ap_int<64 * BLOCK_SIZE> mem[NUM_BLOCKS];
     hls::stream<qdma_axis<32,0,0,0>> s0, s1;
     int mem_offset = 0;
     
@@ -37,6 +35,22 @@ int main()
             qdma_axis<32,0,0,0> out_s1 = s1.read();
             
             std::cout << "idx: " << i << "\ts0: " << out_s0.data.to_int() << "\ts1: " << out_s1.data.to_int() << std::endl;
+        } else 
+        {
+            std::cerr << "Error: Stream underflow at index " << i << std::endl;
+            return 1;
+        }
+    }
+
+    std::cout << "\n\n-------------------------- Reading out is_filter and pt counters --------------------------\n\n" << std::endl;
+
+    for (int i=0; i<N_MIN; i++)
+    {
+        if (!s0.empty()) 
+        {
+            qdma_axis<32,0,0,0> out_s0 = s0.read();
+            
+            std::cout << "idx: " << i << "\ts0: " << out_s0.data.to_int() << std::endl;
         } else 
         {
             std::cerr << "Error: Stream underflow at index " << i << std::endl;

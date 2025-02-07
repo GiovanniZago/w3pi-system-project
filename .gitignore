@@ -18,6 +18,7 @@ data/
 *.log
 *.compile_summary
 *.out
+*.txt
 
 # exclude scripts and specific files
 data_generator.py
