@@ -10,21 +10,21 @@ using namespace adf;
 void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
 {   
     // data variables
-    aie::vector<int16, V_SIZE> pts[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
-    aie::vector<int16, V_SIZE> etas[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
-    aie::vector<int16, V_SIZE> phis[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) }; 
+    aie::vector<int16, V_SIZE> pts[P_BUNCHES]     = { aie::broadcast<int16, V_SIZE>(0) };
+    aie::vector<int16, V_SIZE> etas[P_BUNCHES]    = { aie::broadcast<int16, V_SIZE>(0) };
+    aie::vector<int16, V_SIZE> phis[P_BUNCHES]    = { aie::broadcast<int16, V_SIZE>(0) }; 
     aie::vector<int16, V_SIZE> pdg_ids[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
 
     // filter pt and pdg id
     aie::mask<V_SIZE> is_min_pt[P_BUNCHES], is_med_pt[P_BUNCHES], is_hig_pt[P_BUNCHES], is_pdg_id[P_BUNCHES];
-    int16 min_pt_counter=0, med_pt_counter=0, hig_pt_counter=0;
+    int16 min_pt_counter = 0, med_pt_counter = 0, hig_pt_counter = 0;
     aie::vector<int16, N_MIN> is_filter = aie::broadcast<int16, N_MIN>(0);
-    int16 is_filter_idx=0;
 
-    // auxiliary variables
-    int16 out_idx, in_idx;
-
+    // read pt, eta, phi, pdg_id
+    // moreover count the no. of candidates that
+    // exceed the pt thresholds
     for (int i=0; i<P_BUNCHES; i++)
+    chess_prepare_for_pipelining
     {
         pts[i] = readincr_v<V_SIZE>(in0);
         is_min_pt[i] = aie::geq(pts[i], MIN_PT);
@@ -40,16 +40,31 @@ void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16>
     for (int i=0; i<P_BUNCHES; i++)
     {
         phis[i] = readincr_v<V_SIZE>(in0);
-
         pdg_ids[i] = readincr_v<V_SIZE>(in1);
-        is_pdg_id[i] = aie::geq(ptg_ids[i], 2);
     }
 
-    bool skip_event = false;
-    if ((min_pt_counter < 3) | (med_pt_counter < 2) | (hig_pt_counter < 1)) skip_event = true;
+    // read the vector with the indexes of the 
+    // candidates that exceed the MIN_PT threshold
+    // and that match the correct values of pdg_id
+    is_filter = readincr_v<V_SIZE>(in0);
 
-    // isolation variables
-    int16 pt_sum=0;
+    // if there are not enought candidates in the three
+    // pt categories, the event has to be skipped
+    bool skip_event = ((min_pt_counter < 3) | (med_pt_counter < 2) | (hig_pt_counter < 1)) ? true : false;
+
+    // variables for storing the isolated
+    // (and already filtered) candidates
+    aie::vector<int16, N_MIN> pts_iso_filter     = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> etas_iso_filter    = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> phis_iso_filter    = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> pdg_ids_iso_filter = aie::broadcast<int16, N_MIN>(0);
+
+    // this vector contains the indexes of the
+    // particles that are both filtered and isolated
+    aie::vector<int16, N_MIN> is_iso_filter      = aie::broadcast<int16, N_MIN>(0);
+
+    // isolation auxiliary variables
+    int16 pt_sum = 0;
     aie::vector<int16, V_SIZE> d_eta, d_phi;
     aie::vector<int16, V_SIZE> pt_to_sum;
     aie::vector<int32, V_SIZE> dr2;
@@ -58,21 +73,15 @@ void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16>
     aie::accum<accfloat, V_SIZE> acc_float;
     aie::mask<V_SIZE> is_ge_mindr2, is_le_maxdr2, pt_cut_mask;
 
-    // output variables
-    aie::vector<int16, N_MIN> pts_iso_filter = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> etas_iso_filter = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> phis_iso_filter = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> pdg_ids_iso_filter = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> is_iso_filter = aie::broadcast<int16, N_MIN>(0);
 
     for (int i=0; i<N_MIN; i++)
     {   
         if (skip_event) continue;
         if (!is_filter[i]) continue;
 
-        pt_sum = 0;
+        pt_sum  = 0;
         out_idx = (is_filter[i] - 1) / V_SIZE;
-        in_idx = (is_filter[i] - 1) % V_SIZE;
+        in_idx  = (is_filter[i] - 1) % V_SIZE;
 
         for (int k=0; k<P_BUNCHES; k++)
         chess_prepare_for_pipelining
@@ -89,23 +98,30 @@ void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16>
 
             is_ge_mindr2 = aie::ge(dr2_float, MINDR2_FLOAT);
             is_le_maxdr2 = aie::le(dr2_float, MAXDR2_FLOAT);
-            pt_cut_mask = is_ge_mindr2 & is_le_maxdr2;
+            pt_cut_mask  = is_ge_mindr2 & is_le_maxdr2;
 
             pt_to_sum = aie::select(zeros_vector, pts[k], pt_cut_mask); // select only the pts that fall in the desired range
-            pt_sum += aie::reduce_add(pt_to_sum); // update the pt sum
+            pt_sum    += aie::reduce_add(pt_to_sum); // update the pt sum
         }
 
         if (pt_sum <= (pts[out_idx][in_idx] * MAX_ISO))
         {
-            pts_iso_filter[i] = pts[out_idx][in_idx];
-            etas_iso_filter[i] = etas[out_idx][in_idx];
-            phis_iso_filter[i] = phis[out_idx][in_idx];
+            pts_iso_filter[i]     = pts[out_idx][in_idx];
+            etas_iso_filter[i]    = etas[out_idx][in_idx];
+            phis_iso_filter[i]    = phis[out_idx][in_idx];
             pdg_ids_iso_filter[i] = pdg_ids[out_idx][in_idx];
-            is_iso_filter[i] = is_filter[i];
+            is_iso_filter[i]      = is_filter[i];
         }
     }
 
-    // ang sep specific variables
+    // after calculating isolation for the filtered candidates
+    // look at how many candidates are left. If there are less 
+    // than 3 candidates, the event has to be skipped
+    aie::mask<N_MIN> is_iso_filter_mask = aie::gt(is_iso_filter, (int16) 0);
+    int16 n_iso_filter = is_iso_filter_mask.count();
+    skip_event = (n_iso_filter < 3);
+
+    // angular separation variables
     int16 d_eta, d_phi;
     int32 dr2;
     float dr2_float;
@@ -123,11 +139,9 @@ void unpack_filter_iso(input_stream<int16> * __restrict in0, input_stream<int16>
     float x, sinh;
     float invariant_mass=0;
 
+    // vector that stores the triplet information
+    // idx0, idx1, idx2, invariant mass
     aie::vector<float, 4> triplet = aie::zeros<float, 4>();
-
-    aie::mask<N_MIN> is_iso_filter_mask = aie::gt(is_iso_filter, (int16) 0);
-    int16 n_iso_filter = is_iso_filter_mask.count();
-    bool skip_event = (n_iso_filter < 3);
 
     for (int i0=0; i0<N_MIN; i0++)
     {

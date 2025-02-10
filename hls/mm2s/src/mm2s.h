@@ -14,6 +14,8 @@
 #define MED_PT 48
 #define HIG_PT 60
 
+#define __CSIM__
+
 extern "C" 
 {
 

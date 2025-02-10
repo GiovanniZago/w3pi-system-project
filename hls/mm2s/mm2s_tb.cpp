@@ -9,7 +9,7 @@ int main()
     ap_int<64 * BLOCK_SIZE> mem[NUM_BLOCKS];
     hls::stream<qdma_axis<32,0,0,0>> s0, s1;
     
-    // Open binary data file 
+    // open binary data file 
     std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
 
     if (!bin_file) 
@@ -18,13 +18,14 @@ int main()
         return 1;
     }
 
-    // start = (EV_SIZE + 1) * sizeof(ap_int<64>) means that we will skip the first event
-    // and start reading the file from the second one
-    const int event_idx = 1;
+    // start = event_idx * EV_SIZE * sizeof(ap_int<64>) means that we will skip the 
+    // number of events specified by event_idx
+    const int event_idx = 6;
     std::streampos start = event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 
-    // Here we cast mem to a pointer to char and we fill it with EV_SIZE * no. of bytes occupied by an ap_int<64>
+    // cast mem to a pointer to char and we fill it with EV_SIZE * no. of bytes occupied by an ap_int<64>
+    // i.e. we fill mem with the data corresponding to an event
     bin_file.read(reinterpret_cast<char*>(mem), EV_SIZE * sizeof(ap_int<64>));
     bin_file.close();
     
@@ -36,7 +37,7 @@ int main()
     
     std::cout << "\n\n-------------------------- Reading out Streams --------------------------\n\n" << std::endl;
     
-    // check the output
+    // compare kernel output with golden output
     for (int i = 0; i < 2 * EV_SIZE; i++) 
     {
         if (!s0.empty() && !s1.empty()) 
@@ -59,16 +60,6 @@ int main()
             qdma_axis<32,0,0,0> out_s0 = s0.read();
             
             std::cout << "idx: " << i << "\ts0: " << out_s0.data.to_int() << std::endl;
-
-            if (i < 3)
-            {
-                qdma_axis<32,0,0,0> out_s1 = s1.read();
-
-                std::cout << "idx: " << i << "\ts1: " << out_s1.data.to_int() << std::endl;
-            } else
-            {
-                std::cerr << "Error: Stream (s1) underflow at index " << i << std::endl;
-            }
         } else 
         {
             std::cerr << "Error: Stream (s0) underflow at index " << i << std::endl;
