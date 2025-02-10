@@ -459,4 +459,4 @@ if __name__ == "__main__":
     # file = "puppi_WTo3Pion_PU200.dump"
     file = "PuppiSignal_224.dump"
     with PuppiData(file) as myPuppi:
-        myPuppi.print_lines_data(0, 224)
+        myPuppi.print_lines_data(224, 448)

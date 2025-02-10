@@ -163,12 +163,18 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	ap_int<32> phi[EV_SIZE];
 	ap_int<32> pdg_id[EV_SIZE];
 
-	// ap_int<32> min_pt_counter=0;
-	// ap_int<32> med_pt_counter=0;
-	// ap_int<32> hig_pt_counter=0;
+	ap_int<32> min_pt_counter = 0;
+	ap_int<32> med_pt_counter = 0;
+	ap_int<32> hig_pt_counter = 0;
 
 	ap_int<32> is_filter[N_MIN];
-	ap_int<16> is_filter_idx=0;
+	for (int i = 0; i < N_MIN; i++) 
+	{
+    	#pragma HLS UNROLL
+    	is_filter[i] = 0;
+	}
+
+	ap_int<16> is_filter_idx = 0;
 
 	for (int i=0; i<NUM_BLOCKS; i++)
 	{
@@ -184,9 +190,9 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 			buffer[j] = burst_data.range(64 * (j + 1) - 1, 64 * j);
 
 			pt[i * BLOCK_SIZE + j] = buffer[j].range(13, 0);
-			// min_pt_counter = (pt[i * BLOCK_SIZE + j] >= MIN_PT) ? min_pt_counter++ : min_pt_counter;
-			// med_pt_counter = (pt[i * BLOCK_SIZE + j] >= MED_PT) ? med_pt_counter++ : min_pt_counter;
-			// hig_pt_counter = (pt[i * BLOCK_SIZE + j] >= HIG_PT) ? hig_pt_counter++ : min_pt_counter;
+			min_pt_counter = (pt[i * BLOCK_SIZE + j] >= MIN_PT) ? ap_int<32>(min_pt_counter + 1) : min_pt_counter;
+			med_pt_counter = (pt[i * BLOCK_SIZE + j] >= MED_PT) ? ap_int<32>(med_pt_counter + 1) : min_pt_counter;
+			hig_pt_counter = (pt[i * BLOCK_SIZE + j] >= HIG_PT) ? ap_int<32>(hig_pt_counter + 1) : min_pt_counter;
 
 			eta[i * BLOCK_SIZE + j] = buffer[j].range(25, 14);
 			eta[i * BLOCK_SIZE + j] = eta[i * BLOCK_SIZE + j] | ((eta[i * BLOCK_SIZE + j][11]) ? 0xFFFFF000 : 0x00000000);
@@ -197,10 +203,13 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 			pdg_id[i * BLOCK_SIZE + j] = buffer[j].range(39, 37);
 			pdg_id[i * BLOCK_SIZE + j] = pdg_id[i * BLOCK_SIZE + j] | ((pdg_id[i * BLOCK_SIZE + j][2]) ? 0xFFFFFFF8 : 0x00000000);
 
-			if ((pt[i * BLOCK_SIZE + j] >= MIN_PT) & (pdg_id[i * BLOCK_SIZE + j] >= 2))
+			printf("Idx %d\tpt (%d) >= PT_MIN = %d \t pdg_id (%d) >= 2 = %d\n", i * BLOCK_SIZE + j, pt[i * BLOCK_SIZE + j], pt[i * BLOCK_SIZE + j] >= MIN_PT, pdg_id[i * BLOCK_SIZE + j], pdg_id[i * BLOCK_SIZE + j] >= 2);
+			printf("      \tpt (%d) >= PT_MED = %d \t pt (%d) >= PT_HIG = %d\n", pt[i * BLOCK_SIZE + j], pt[i * BLOCK_SIZE + j] >= MED_PT, pdg_id[i * BLOCK_SIZE + j], pt[i * BLOCK_SIZE + j] >= HIG_PT);
+
+			if ((pt[i * BLOCK_SIZE + j] >= MIN_PT) && (pdg_id[i * BLOCK_SIZE + j] >= 2))
 			{
 				is_filter[is_filter_idx] = i * BLOCK_SIZE + j + 1;
-				is_filter_idx++;
+				is_filter_idx = is_filter_idx + 1;
 			}
 		}
 	}
@@ -246,21 +255,21 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 		s0.write(x_is_filter);
 	}
 
-	// qdma_axis<32,0,0,0> x_counters;
+	qdma_axis<32,0,0,0> x_min_pt_counter, x_med_pt_counter, x_hig_pt_counter;
 
-	// #pragma HLS PIPELINE
+	#pragma HLS PIPELINE
 
-	// x_counters.data = min_pt_counter;
-	// x_counters.keep_all();
-	// s1.write(x_counters);
+	x_min_pt_counter.data = min_pt_counter;
+	x_min_pt_counter.keep_all();
+	s1.write(x_min_pt_counter);
 
-	// x_counters.data = med_pt_counter;
-	// x_counters.keep_all();
-	// s1.write(x_counters);
+	x_med_pt_counter.data = med_pt_counter;
+	x_med_pt_counter.keep_all();
+	s1.write(x_med_pt_counter);
 
-	// x_counters.data = hig_pt_counter;
-	// x_counters.keep_all();
-	// s1.write(x_counters);
+	x_hig_pt_counter.data = hig_pt_counter;
+	x_hig_pt_counter.keep_all();
+	s1.write(x_hig_pt_counter);
 }
 
 }
