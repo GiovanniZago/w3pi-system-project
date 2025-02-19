@@ -7,67 +7,58 @@
 
 using namespace adf;
 
-void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
+void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16> * __restrict out0, output_stream<int16> * __restrict out1)
 {   
     // data variables
-    aie::vector<int16, V_SIZE> pts[P_BUNCHES]     = { aie::broadcast<int16, V_SIZE>(0) };
-    aie::vector<int16, V_SIZE> etas[P_BUNCHES]    = { aie::broadcast<int16, V_SIZE>(0) };
-    aie::vector<int16, V_SIZE> phis[P_BUNCHES]    = { aie::broadcast<int16, V_SIZE>(0) }; 
+    int64 data; 
+    aie::vector<int16, V_SIZE> pts[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
+    aie::vector<int16, V_SIZE> etas[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
+    aie::vector<int16, V_SIZE> phis[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) }; 
     aie::vector<int16, V_SIZE> pdg_ids[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
 
     // filter pt and pdg id
-    aie::mask<V_SIZE> is_min_pt[P_BUNCHES], is_med_pt[P_BUNCHES], is_hig_pt[P_BUNCHES], is_pdg_id[P_BUNCHES];
-    int16 min_pt_counter = 0, med_pt_counter = 0, hig_pt_counter = 0;
+    bool is_min_pt, is_med_pt, is_hig_pt, is_pdg_id;
+    int16 min_pt_counter=0, med_pt_counter=0, hig_pt_counter=0;
     aie::vector<int16, N_MIN> is_filter = aie::broadcast<int16, N_MIN>(0);
+    int16 is_filter_idx=0;
 
-    // read pt, eta, phi, pdg_id
-    // moreover count the no. of candidates that
-    // exceed the pt thresholds
-    for (int i=0; i<P_BUNCHES; i++)
-    chess_prepare_for_pipelining
+    // auxiliary variables
+    int16 out_idx, in_idx;
+
+    for (int i=0; i<EV_SIZE; i++)
     {
-        pts[i].insert(0, readincr_v<V_SIZE>(in0));
-        is_min_pt[i] = aie::ge(pts[i], MIN_PT);
-        is_med_pt[i] = aie::ge(pts[i], MED_PT);
-        is_hig_pt[i] = aie::ge(pts[i], HIG_PT);
-        min_pt_counter += is_min_pt[i].count();
-        med_pt_counter += is_med_pt[i].count();
-        hig_pt_counter += is_hig_pt[i].count();
+        data = readincr(in);
+        if (!data) continue;
 
-        etas[i].insert(0, readincr_v<V_SIZE>(in1));
+        out_idx = i / V_SIZE;
+        in_idx = i % V_SIZE;
+
+        pts[out_idx][in_idx] = ((1 << (PT_MSB + 1)) - 1) & data;
+        etas[out_idx][in_idx] = (data << 38) >> 52;
+        phis[out_idx][in_idx] = (data << 27) >> 53;
+        pdg_ids[out_idx][in_idx] = ((1 << (PDG_ID_MSB + 1)) - 1) & (data >> 37);
+
+        is_min_pt = pts[out_idx][in_idx] >= MIN_PT;
+        is_med_pt = pts[out_idx][in_idx] >= MED_PT;
+        is_hig_pt = pts[out_idx][in_idx] >= HIG_PT;
+        is_pdg_id = (pdg_ids[out_idx][in_idx] == 2) | (pdg_ids[out_idx][in_idx] == 3) | (pdg_ids[out_idx][in_idx] == 4) | (pdg_ids[out_idx][in_idx] == 5);
+
+        if ((is_filter_idx < N_MIN) & (is_min_pt) & (is_pdg_id)) 
+        {
+            is_filter[is_filter_idx] = i + 1;
+            is_filter_idx++;
+            min_pt_counter++;
+
+            if (is_med_pt) med_pt_counter++;
+            if (is_hig_pt) hig_pt_counter++;
+        }
     }
 
-    for (int i=0; i<P_BUNCHES; i++)
-    {
-        phis[i].insert(0, readincr_v<V_SIZE>(in0));
-        pdg_ids[i].insert(0, readincr_v<V_SIZE>(in1));
-    }
+    bool skip_event = false;
+    if ((min_pt_counter < 3) | (med_pt_counter < 2) | (hig_pt_counter < 1)) skip_event = true;
 
-    // read the vector with the indexes of the 
-    // candidates that exceed the MIN_PT threshold
-    // and that match the correct values of pdg_id
-    is_filter.insert(0, readincr_v<N_MIN>(in0));
-
-    // #if defined(__X86DEBUG__)
-    // aie::print(pts[0], true);
-    // #endif
-
-    // if there are not enought candidates in the three
-    // pt categories, the event has to be skipped
-    bool skip_event = ((min_pt_counter < 3) | (med_pt_counter < 2) | (hig_pt_counter < 1)) ? true : false;
-
-    // variables for storing the isolated
-    // (and already filtered) candidates
-    aie::vector<int16, N_MIN> pts_iso_filter     = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> etas_iso_filter    = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> phis_iso_filter    = aie::broadcast<int16, N_MIN>(0);
-    aie::vector<int16, N_MIN> pdg_ids_iso_filter = aie::broadcast<int16, N_MIN>(0);
-
-    // this vector contains the indexes of the
-    // particles that are both filtered and isolated
-    aie::vector<int16, N_MIN> is_iso_filter      = aie::broadcast<int16, N_MIN>(0);
-
-    // isolation auxiliary variables
+    // isolation variables
+    int16 pt_sum=0;
     aie::vector<int16, V_SIZE> d_eta, d_phi;
     aie::vector<int16, V_SIZE> pt_to_sum;
     aie::vector<int32, V_SIZE> dr2;
@@ -77,23 +68,29 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     aie::mask<V_SIZE> is_ge_mindr2, is_le_maxdr2, pt_cut_mask;
 
     // variables for the two-pi check
+    const aie::vector<int16, V_SIZE> zeros_vector = aie::zeros<int16, V_SIZE>();
     aie::mask<V_SIZE> is_gt_pi, is_lt_mpi;
     aie::vector<int16, V_SIZE> d_phi_ptwopi, d_phi_mtwopi;
-    const aie::vector<int16, V_SIZE> zeros_vector = aie::zeros<int16, V_SIZE>();
     const aie::vector<int16, V_SIZE> pi_vector = aie::broadcast<int16, V_SIZE>(PI);
     const aie::vector<int16, V_SIZE> mpi_vector = aie::broadcast<int16, V_SIZE>(MPI);
     const aie::vector<int16, V_SIZE> twopi_vector = aie::broadcast<int16, V_SIZE>(TWOPI);
     const aie::vector<int16, V_SIZE> mtwopi_vector = aie::broadcast<int16, V_SIZE>(MTWOPI);
 
+    // output variables
+    aie::vector<int16, N_MIN> pts_iso_filter = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> etas_iso_filter = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> phis_iso_filter = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> pdg_ids_iso_filter = aie::broadcast<int16, N_MIN>(0);
+    aie::vector<int16, N_MIN> is_iso_filter = aie::broadcast<int16, N_MIN>(0);
 
     for (int i=0; i<N_MIN; i++)
     {   
         if (skip_event) continue;
         if (!is_filter[i]) continue;
 
-        int16 pt_sum  = 0;
-        int16 out_idx = (is_filter[i] - 1) / V_SIZE;
-        int16 in_idx  = (is_filter[i] - 1) % V_SIZE;
+        pt_sum = 0;
+        out_idx = (is_filter[i] - 1) / V_SIZE;
+        in_idx = (is_filter[i] - 1) % V_SIZE;
 
         for (int k=0; k<P_BUNCHES; k++)
         chess_prepare_for_pipelining
@@ -117,33 +114,45 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
 
             is_ge_mindr2 = aie::ge(dr2_float, MINDR2_FLOAT);
             is_le_maxdr2 = aie::le(dr2_float, MAXDR2_FLOAT);
-            pt_cut_mask  = is_ge_mindr2 & is_le_maxdr2;
+            pt_cut_mask = is_ge_mindr2 & is_le_maxdr2;
 
             pt_to_sum = aie::select(zeros_vector, pts[k], pt_cut_mask); // select only the pts that fall in the desired range
-            pt_sum    += aie::reduce_add(pt_to_sum); // update the pt sum
+            pt_sum += aie::reduce_add(pt_to_sum); // update the pt sum
         }
 
         if (pt_sum <= (pts[out_idx][in_idx] * MAX_ISO))
         {
-            pts_iso_filter[i]     = pts[out_idx][in_idx];
-            etas_iso_filter[i]    = etas[out_idx][in_idx];
-            phis_iso_filter[i]    = phis[out_idx][in_idx];
+            pts_iso_filter[i] = pts[out_idx][in_idx];
+            etas_iso_filter[i] = etas[out_idx][in_idx];
+            phis_iso_filter[i] = phis[out_idx][in_idx];
             pdg_ids_iso_filter[i] = pdg_ids[out_idx][in_idx];
-            is_iso_filter[i]      = is_filter[i];
+            is_iso_filter[i] = is_filter[i];
         }
     }
 
-    // after calculating isolation for the filtered candidates
-    // look at how many candidates are left. If there are less 
-    // than 3 candidates, the event has to be skipped
-    aie::mask<N_MIN> is_iso_filter_mask = aie::gt(is_iso_filter, (int16) 0);
-    int16 n_iso_filter = is_iso_filter_mask.count();
-    skip_event = (n_iso_filter < 3);
+    writeincr(out0, pts_iso_filter);    
+    writeincr(out1, etas_iso_filter);    
+    writeincr(out0, phis_iso_filter);    
+    writeincr(out1, pdg_ids_iso_filter);    
+    writeincr(out0, is_iso_filter);    
+}
 
-    // angular separation variables
-    int16 d_eta_scalar, d_phi_scalar;
-    int32 dr2_scalar;
-    float dr2_float_scalar;
+void combinatorial(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
+{
+    // data variables
+    aie::vector<int16, N_MIN> pts_iso_filter, etas_iso_filter, phis_iso_filter, pdg_ids_iso_filter, is_iso_filter;
+
+    // READ DATA 
+    pts_iso_filter.insert(0, readincr_v<N_MIN>(in0));
+    etas_iso_filter.insert(0, readincr_v<N_MIN>(in1));
+    phis_iso_filter.insert(0, readincr_v<N_MIN>(in0));
+    pdg_ids_iso_filter.insert(0, readincr_v<N_MIN>(in1));
+    is_iso_filter.insert(0, readincr_v<N_MIN>(in0));
+
+    // ang sep specific variables
+    int16 d_eta, d_phi;
+    int32 dr2;
+    float dr2_float;
     int16 eta_hig_pt_target0, eta_hig_pt_target1, eta_hig_pt_target2;
     int16 phi_hig_pt_target0, phi_hig_pt_target1, phi_hig_pt_target2;
     int16 pt_hig_pt_target0, pt_hig_pt_target1, pt_hig_pt_target2;
@@ -158,9 +167,11 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     float x, sinh;
     float invariant_mass=0;
 
-    // vector that stores the triplet information
-    // idx0, idx1, idx2, invariant mass
     aie::vector<float, 4> triplet = aie::zeros<float, 4>();
+
+    aie::mask<N_MIN> is_iso_filter_mask = aie::gt(is_iso_filter, (int16) 0);
+    int16 n_iso_filter = is_iso_filter_mask.count();
+    bool skip_event = (n_iso_filter < 3);
 
     for (int i0=0; i0<N_MIN; i0++)
     {
@@ -176,14 +187,14 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
             if (i1 == i0) continue;
             if (!is_iso_filter[i1]) continue;
 
-            d_eta_scalar = etas_iso_filter[i1] - eta_hig_pt_target0;
-            d_phi_scalar = phis_iso_filter[i1] - phi_hig_pt_target0;
-            d_phi_scalar = (d_phi_scalar <= PI) ? ((d_phi_scalar >= MPI) ? d_phi_scalar : d_phi_scalar + TWOPI) : d_phi_scalar + MTWOPI;
+            d_eta = etas_iso_filter[i1] - eta_hig_pt_target0;
+            d_phi = phis_iso_filter[i1] - phi_hig_pt_target0;
+            d_phi = (d_phi <= PI) ? ((d_phi >= MPI) ? d_phi : d_phi + TWOPI) : d_phi + MTWOPI;
 
-            dr2_scalar = d_eta_scalar * d_eta_scalar + d_phi_scalar * d_phi_scalar;
-            dr2_float_scalar = dr2_scalar * F_CONV2;
+            dr2 = d_eta * d_eta + d_phi * d_phi;
+            dr2_float = dr2 * F_CONV2;
 
-            if (dr2_float_scalar < MINDR2_ANGSEP_FLOAT) continue;
+            if (dr2_float < MINDR2_ANGSEP_FLOAT) continue;
 
             pt_hig_pt_target1 = pts_iso_filter[i1];
             eta_hig_pt_target1 = etas_iso_filter[i1];
@@ -195,18 +206,27 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
                 if (i2 == i1) continue;
                 if (!is_iso_filter[i2]) continue;
 
-                d_eta_scalar = etas_iso_filter[i2] - eta_hig_pt_target1;
-                d_phi_scalar = phis_iso_filter[i2] - phi_hig_pt_target1;
-                d_phi_scalar = (d_phi_scalar <= PI) ? ((d_phi_scalar >= MPI) ? d_phi_scalar : d_phi_scalar + TWOPI) : d_phi_scalar + MTWOPI;
+                d_eta = etas_iso_filter[i2] - eta_hig_pt_target1;
+                d_phi = phis_iso_filter[i2] - phi_hig_pt_target1;
+                d_phi = (d_phi <= PI) ? ((d_phi >= MPI) ? d_phi : d_phi + TWOPI) : d_phi + MTWOPI;
 
-                dr2_scalar = d_eta_scalar * d_eta_scalar + d_phi_scalar * d_phi_scalar;
-                dr2_float_scalar = dr2_scalar * F_CONV2;
+                dr2 = d_eta * d_eta + d_phi * d_phi;
+                dr2_float = dr2 * F_CONV2;
 
-                if (dr2_float_scalar < MINDR2_ANGSEP_FLOAT) continue;
+                if (dr2_float < MINDR2_ANGSEP_FLOAT) continue;
 
                 pt_hig_pt_target2 = pts_iso_filter[i2];
                 eta_hig_pt_target2 = etas_iso_filter[i2];
                 phi_hig_pt_target2 = phis_iso_filter[i2];
+
+                d_eta = pt_hig_pt_target2 - eta_hig_pt_target0;
+                d_phi = pt_hig_pt_target2 - phi_hig_pt_target0;
+                d_phi = (d_phi <= PI) ? ((d_phi >= MPI) ? d_phi : d_phi + TWOPI) : d_phi + MTWOPI;
+
+                dr2 = d_eta * d_eta + d_phi * d_phi;
+                dr2_float = dr2 * F_CONV2;
+
+                if (dr2_float < MINDR2_ANGSEP_FLOAT) continue;
 
                 charge0 = (pdg_ids_iso_filter[i0] >= 4) ? ((pdg_ids_iso_filter[i0] == 4) ? -1 : 1) : ((pdg_ids_iso_filter[i0] == 2) ? -1 : 1);
                 charge1 = (pdg_ids_iso_filter[i1] >= 4) ? ((pdg_ids_iso_filter[i1] == 4) ? -1 : 1) : ((pdg_ids_iso_filter[i1] == 2) ? -1 : 1);

@@ -29,3 +29,4 @@ playground.o
 # allow only specific files
 !link/system.cfg
 !hw-emu/xrt.ini
+!aie*/data

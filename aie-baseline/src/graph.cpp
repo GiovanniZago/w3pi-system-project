@@ -2,8 +2,6 @@
  
 W3PiGraph mygraph;
 
-#if defined(__AIESIM__) || defined(__X86SIM__)
-
 int main(void) 
 {
     int N_iter = 1;
@@ -14,5 +12,3 @@ int main(void)
 
     return 0;
 }
-
-#endif

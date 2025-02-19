@@ -42,6 +42,8 @@ static const float MASS_P = 0.13957039;
 
 using namespace adf;
 
-void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out);
+void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16> * __restrict out0, output_stream<int16> * __restrict out1);
+
+void combinatorial(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out);
 
 #endif

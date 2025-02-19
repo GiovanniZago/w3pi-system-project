@@ -20,7 +20,7 @@ int main()
 
     // start = event_idx * EV_SIZE * sizeof(ap_int<64>) means that we will skip the 
     // number of events specified by event_idx
-    const int event_idx = 6;
+    const int event_idx = 1;
     std::streampos start = event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 

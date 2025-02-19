@@ -3,30 +3,33 @@
 
 using namespace adf;
 
-class Dr2Graph : public graph 
+class W3PiGraph : public graph 
 {
     private:
-        kernel dr2_11_k;
+        kernel w3pi_k;
 
     public:
-        input_plio in_11;
-        output_plio out_11;
+        input_plio in0;
+        input_plio in1;
+        output_plio out;
 
-        Dr2Graph() 
+        W3PiGraph() 
         {
-            dr2_11_k = kernel::create(dr2_11);
+            w3pi_k = kernel::create(w3pi);
 
-            in_11 = input_plio::create("in_11", plio_64_bits, "etaphi_11_plio_64_if_16.txt", 360);
-            out_11 = output_plio::create("out_11", plio_32_bits, "out_11.csv", 360);
+            in0 = input_plio::create("in0", plio_32_bits, "in0.txt", 360);
+            in1 = input_plio::create("in1", plio_32_bits, "in1.txt", 360);
+            out = output_plio::create("out", plio_32_bits, "out.txt", 360);
 
             // PL inputs
-            connect<stream>(in_11.out[0], dr2_11_k.in[0]);
+            connect<stream>(in0.out[0], w3pi_k.in[0]);
+            connect<stream>(in1.out[0], w3pi_k.in[1]);
 
             // PL outputs
-            connect<stream>(dr2_11_k.out[0], out_11.in[0]);
+            connect<stream>(w3pi_k.out[0], out.in[0]);
 
             // sources and runtime ratios
-            source(dr2_11_k) = "kernels.cpp";
-            runtime<ratio>(dr2_11_k) = 1;
+            source(w3pi_k) = "kernels.cpp";
+            runtime<ratio>(w3pi_k) = 1;
         }
 };

@@ -17,24 +17,26 @@ def get_xilinx_environment():
 
 def generate_txts(input_file, f_conv, plio_width, interface_width, stacked=False):
     with h5py.File(config.AIE_DATA + "/" + input_file, 'r') as f:
+        pt = f["0"]["pt"][:]
         eta = f["0"]["eta"][:]
         phi = f["0"]["phi"][:]
+        pdg_id = f["0"]["phi"][:]
 
         # filter out values that have values of |eta| > 2.4 and |phi| > pi
-        eta_mask = np.abs(eta) <= 2.4
-        phi_mask = np.abs(phi) <= np.pi
-        tot_mask = eta_mask & phi_mask
-        eta = eta[tot_mask]
-        phi = phi[tot_mask]
-        eta = eta / f_conv
-        phi = phi / f_conv
+        # eta_mask = np.abs(eta) <= 2.4
+        # phi_mask = np.abs(phi) <= np.pi
+        # tot_mask = eta_mask & phi_mask
+        # eta = eta[tot_mask]
+        # phi = phi[tot_mask]
+        # eta = eta / f_conv
+        # phi = phi / f_conv
 
-        # zero pad to reach 128 particles
-        if len(eta) < 128:
-            eta = np.pad(eta, (0, 128 - len(eta)), 'constant')
+        # zero pad to reach 224 particles
+        if len(eta) < 224:
+            eta = np.pad(eta, (0, 224 - len(eta)), 'constant')
 
-        if len(phi) < 128:
-            phi = np.pad(phi, (0, 128 - len(phi)), 'constant')
+        if len(phi) < 224:
+            phi = np.pad(phi, (0, 224 - len(phi)), 'constant')
 
         # transform lists into numpy arrays
         n_cols = np.int16(plio_width / interface_width)
@@ -82,7 +84,25 @@ def aie_compile_hw(env):
                     f"{config.AIE_SRC}/graph.cpp",
                     "-workdir", 
                     f"{config.WORK_HW}", 
-                    "--stacksize=2048"], 
+                    "--stacksize=16384"], 
+                    env=env)
+    
+def aie_compile_baseline_hw(env):
+    os.chdir(config.AIE_HW_BASELINE)
+
+    subprocess.run(["aiecompiler", # no debug flag needed here
+                    "-target",
+                    "hw", 
+                    "--platform",
+                    f"{config.XILINX_VCK5000_GEN4X8_XDMA}", 
+                    "-I", 
+                    f"{config.AIE_SRC_BASELINE}", 
+                    f"{config.AIE_SRC_BASELINE}/graph.cpp",
+                    "-workdir", 
+                    f"{config.WORK_HW_BASELINE}", 
+                    "--stacksize=4800", 
+                    "--pl-freq=360", 
+                    "--Xchess=main:darts.xargs=-nb"], 
                     env=env)
     
 def run_x86_simulator(env):
@@ -92,8 +112,7 @@ def run_x86_simulator(env):
                     "--dump",
                     f"--pkg-dir={config.WORK_X86}", 
                     f"--input-dir={config.AIE_DATA}",
-                    f"--output-dir={config.OUT_SIM_X86}",
-                    f"--trace"], 
+                    f"--output-dir={config.OUT_SIM_X86}"], 
                     env=env)
     
 def run_aiesimulator(env):
@@ -104,6 +123,16 @@ def run_aiesimulator(env):
                     f"--pkg-dir={config.WORK_HW}",
                     f"--input-dir={config.AIE_DATA}", 
                     f"--output-dir={config.OUT_SIM_AIE}"], 
+                    env=env)
+    
+def run_baseline_aiesimulator(env):
+    os.chdir(config.AIE_HW_BASELINE)
+
+    subprocess.run(["aiesimulator", 
+                    "--dump-vcd=foo", 
+                    f"--pkg-dir={config.WORK_HW_BASELINE}",
+                    f"--input-dir={config.AIE_DATA_BASELINE}", 
+                    f"--output-dir={config.OUT_SIM_AIE_BASELINE}"], 
                     env=env)
     
 def hls_compile(env, kernel_name):
@@ -209,12 +238,15 @@ if __name__ == "__main__":
     # generate_txts(input_file, config.F_CONV_11, 64, 16, True)
 
     # aie_compile_x86(env)
-    # run_x86_simulator(env)
+    run_x86_simulator(env)
 
     # aie_compile_hw(env)
     # run_aiesimulator(env)
 
-    hls_compile(env, "mm2s")
+    # aie_compile_baseline_hw(env)
+    # run_baseline_aiesimulator(env)
+
+    # hls_compile(env, "mm2s")
     # hls_compile(env, "s2mm")
 
     # link_system(env)
