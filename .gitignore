@@ -19,6 +19,7 @@ data/
 *.compile_summary
 *.out
 *.txt
+*.csv
 
 # exclude scripts and specific files
 data_generator.py
