@@ -130,6 +130,14 @@ void unpack_filter_iso(input_stream<int64> * __restrict in, output_stream<int16>
         }
     }
 
+    #if defined(__X86DEBUG__)
+    aie::print(pts_iso_filter, true);
+    aie::print(etas_iso_filter, true);
+    aie::print(phis_iso_filter, true);
+    aie::print(pdg_ids_iso_filter, true);
+    aie::print(is_iso_filter, true);
+    #endif
+
     writeincr(out0, pts_iso_filter);    
     writeincr(out1, etas_iso_filter);    
     writeincr(out0, phis_iso_filter);    

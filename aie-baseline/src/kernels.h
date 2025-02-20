@@ -7,7 +7,7 @@
 #define EV_SIZE 224
 #define P_BUNCHES 7
 
-// #define __X86DEBUG__ 
+#define __X86DEBUG__ 
 // #define __X86PTCUTDEBUG__
 // #define __x86ISODEBUG__
 // #define __x86ANGSEPDEBUG__

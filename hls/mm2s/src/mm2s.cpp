@@ -18,14 +18,13 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	ap_int<32> pdg_id[EV_SIZE];
 
 	ap_int<32> is_filter[N_MIN];
+	ap_int<16> is_filter_idx = 0;
 
 	for (int i=0; i<N_MIN; i++) 
 	{
     	#pragma HLS UNROLL
     	is_filter[i] = 0;
 	}
-
-	ap_int<16> is_filter_idx = 0;
 
 	for (int i=0; i<NUM_BLOCKS; i++)
 	{
@@ -60,20 +59,15 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 		}
 	}
 
-	for (int i=0; i<EV_SIZE; i++)
-	{
-		#pragma HLS PIPELINE II=1
-
-		bool is_filter_condition = (pt[i] >= MIN_PT) && ((pdg_id[i] >= 2) && (pdg_id[i] <= 5));
-		is_filter[is_filter_idx] = (is_filter_condition) ? ap_int<32>(i + 1) : is_filter[is_filter_idx];
-		is_filter_idx += is_filter_condition;
-	}
-
 	qdma_axis<32,0,0,0> x_pt, x_eta, x_phi, x_pdg_id;
-
+	
 	for (int j=0; j<EV_SIZE; j++)
 	{
 		#pragma HLS PIPELINE II=1
+		
+		bool is_filter_condition = (pt[j] >= MIN_PT) && ((pdg_id[j] >= 2) && (pdg_id[j] <= 5));
+		is_filter[is_filter_idx] = (is_filter_condition) ? ap_int<32>(j + 1) : is_filter[is_filter_idx];
+		is_filter_idx += is_filter_condition;
 
 		x_pt.data = pt[j];
 		x_eta.data = eta[j];

@@ -9,6 +9,10 @@ using namespace adf;
 
 void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
 {   
+    #if defined(__X86DEBUG__)
+    printf("----- PROCESSING EVENT -----\n");
+    #endif
+
     // data variables
     aie::vector<int16, V_SIZE> pts[P_BUNCHES]     = { aie::broadcast<int16, V_SIZE>(0) };
     aie::vector<int16, V_SIZE> etas[P_BUNCHES]    = { aie::broadcast<int16, V_SIZE>(0) };
@@ -36,7 +40,7 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
 
         etas[i].insert(0, readincr_v<V_SIZE>(in1));
     }
-
+    
     for (int i=0; i<P_BUNCHES; i++)
     {
         phis[i].insert(0, readincr_v<V_SIZE>(in0));
@@ -48,9 +52,9 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     // and that match the correct values of pdg_id
     is_filter.insert(0, readincr_v<N_MIN>(in0));
 
-    // #if defined(__X86DEBUG__)
-    // aie::print(pts[0], true);
-    // #endif
+    #if defined(__X86DEBUG__)
+    aie::print(is_filter, true, "is_filter: ");
+    #endif
 
     // if there are not enought candidates in the three
     // pt categories, the event has to be skipped
@@ -133,6 +137,14 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
         }
     }
 
+    #if defined(__X86DEBUG__)
+    aie::print(pts_iso_filter, true, "pts_iso_filter: ");
+    aie::print(etas_iso_filter, true, "etas_iso_filter: ");
+    aie::print(phis_iso_filter, true, "phis_iso_filter: ");
+    aie::print(pdg_ids_iso_filter, true, "pdg_ids_iso_filter: ");
+    aie::print(is_iso_filter, true, "is_iso_filter: ");
+    #endif
+
     // after calculating isolation for the filtered candidates
     // look at how many candidates are left. If there are less 
     // than 3 candidates, the event has to be skipped
@@ -161,6 +173,9 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     // vector that stores the triplet information
     // idx0, idx1, idx2, invariant mass
     aie::vector<float, 4> triplet = aie::zeros<float, 4>();
+
+    // loop exit flag
+    bool exitLoop = false;
 
     for (int i0=0; i0<N_MIN; i0++)
     {
@@ -244,20 +259,25 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
 
                 invariant_mass = aie::sqrt(e_tot * e_tot - px_tot * px_tot - py_tot * py_tot - pz_tot * pz_tot);
 
+                #if defined(__X86DEBUG__)
+                printf("triplet invariant mass: %f\n", invariant_mass);
+                #endif
+                
                 if ((invariant_mass < MIN_MASS) | (invariant_mass > MAX_MASS)) continue;
 
-                triplet_score = pt_hig_pt_target0 + pt_hig_pt_target1 + pt_hig_pt_target2;
-
-                if (triplet_score > best_triplet_score)
-                {   
-                    best_triplet_score = triplet_score;
-                    triplet[0] = is_iso_filter[i0] - 1;
-                    triplet[1] = is_iso_filter[i1] - 1;
-                    triplet[2] = is_iso_filter[i2] - 1;
-                    triplet[3] = invariant_mass;
-                }
+                triplet[0] = is_iso_filter[i0] - 1;
+                triplet[1] = is_iso_filter[i1] - 1;
+                triplet[2] = is_iso_filter[i2] - 1;
+                triplet[3] = invariant_mass;
+                
+                exitLoop = true;
+                break;
             }
+
+            if (exitLoop) break;
         }
+
+        if (exitLoop) break;
     }
 
     writeincr(out, triplet);

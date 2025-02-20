@@ -6,7 +6,7 @@
 #include <ap_axi_sdata.h>
 
 #define EV_SIZE 224
-#define BLOCK_SIZE 4
+#define BLOCK_SIZE 16
 #define NUM_BLOCKS EV_SIZE / BLOCK_SIZE 
 #define N_MIN 16
 
@@ -14,7 +14,7 @@
 #define MED_PT 48
 #define HIG_PT 60
 
-#define __CSIM__
+// #define __CSIM__
 
 extern "C" 
 {

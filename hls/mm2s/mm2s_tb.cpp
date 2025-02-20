@@ -1,5 +1,7 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
+
 #include "hls_stream.h"
 #include "ap_int.h"
 #include "src/mm2s.h"

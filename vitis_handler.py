@@ -4,6 +4,36 @@ import numpy as np
 import subprocess
 import config
 
+TO_FIXED_FACTORS = {"pt": 1 / 0.25, "eta": 1 / config.F_CONV_11, "phi": 1 / config.F_CONV_11, "pdg_id": 1, "gen_pi_idx": 1}
+
+def get_raw_pdgid(pdg_id):
+    if pdg_id == 130:
+        return 0
+
+    elif pdg_id == 22:
+        return 1
+
+    elif pdg_id == -211:
+        return 2
+    
+    elif pdg_id == 211:
+        return 3
+    
+    elif pdg_id == 11:
+        return 4
+    
+    elif pdg_id == -11:
+        return 5
+    
+    elif pdg_id == 13:
+        return 6
+
+    elif pdg_id == -13:
+        return 7
+    
+    else:
+        return "ERR"
+
 def get_xilinx_environment():
     command = f'bash -c "source {config.XILINX_SETUP} && env"'
     result = subprocess.run(command, capture_output=True, text=True, shell=True)
@@ -15,49 +45,51 @@ def get_xilinx_environment():
 
     return env
 
-def generate_txts(input_file, f_conv, plio_width, interface_width, stacked=False):
-    with h5py.File(config.AIE_DATA + "/" + input_file, 'r') as f:
-        pt = f["0"]["pt"][:]
-        eta = f["0"]["eta"][:]
-        phi = f["0"]["phi"][:]
-        pdg_id = f["0"]["phi"][:]
-
-        # filter out values that have values of |eta| > 2.4 and |phi| > pi
-        # eta_mask = np.abs(eta) <= 2.4
-        # phi_mask = np.abs(phi) <= np.pi
-        # tot_mask = eta_mask & phi_mask
-        # eta = eta[tot_mask]
-        # phi = phi[tot_mask]
-        # eta = eta / f_conv
-        # phi = phi / f_conv
-
-        # zero pad to reach 224 particles
-        if len(eta) < 224:
-            eta = np.pad(eta, (0, 224 - len(eta)), 'constant')
-
-        if len(phi) < 224:
-            phi = np.pad(phi, (0, 224 - len(phi)), 'constant')
-
-        # transform lists into numpy arrays
+def generate_txts(input_file: str, events: list, plio_width: int, interface_width: int, out_files: list):
+    with h5py.File(config.DATA + "/" + input_file, 'r') as f:
+        assert plio_width % interface_width == 0, "plio_width is not an integer multiple of interface_width"
         n_cols = np.int16(plio_width / interface_width)
+
+        assert len(out_files) == 2, "Expected two out files"
+        f_0 = open(config.AIE_DATA + "/" + out_files[0] + ".txt", "w")
+        f_1 = open(config.AIE_DATA + "/" + out_files[1] + ".txt", "w")
+
+        for event in events:
+            event_data = {}
+
+            for i, var in enumerate(["pt", "eta", "phi", "pdg_id"]):
+                var_data = f[str(event)][var][:] * TO_FIXED_FACTORS[var]
+
+                if var == "pdg_id":
+                    var_data = np.array([get_raw_pdgid(el) for el in var_data])
+
+                var_data = np.pad(var_data, (0, 224 - len(var_data)), mode="constant", constant_values=0).astype(np.int16)
+                var_data = var_data.reshape((-1, n_cols))
+                event_data[var] = var_data
         
-        if (128 % n_cols) != 0:
-            raise ValueError("128 / n_cols is not integer")
-        
-        n_rows = np.int16(128 / n_cols)
+            pts = f[str(event)]["pt"][:]
+            pdg_ids = f[str(event)]["pdg_id"][:]
+            is_filter_pt = pts > 7
+            is_filter_pdg_id = (np.abs(pdg_ids) == 211) | (np.abs(pdg_ids) == 11)
+            is_filter = np.logical_and(is_filter_pt, is_filter_pdg_id)
+            is_filter_idx = np.argwhere(is_filter).squeeze(1)
+            is_filter_idx += 1
+            is_filter_idx = np.pad(is_filter_idx, (0, 16 - len(is_filter_idx)), mode="constant", constant_values=0)
+            is_filter_idx = is_filter_idx.reshape(-1, n_cols)
+            event_data["is_filter_idx"] = is_filter_idx
 
-        eta = eta.astype(np.int16).reshape(n_rows, n_cols)
-        phi = phi.astype(np.int16).reshape(n_rows, n_cols)
+            pt_phi_filteridx = np.vstack((event_data["pt"], event_data["phi"], event_data["is_filter_idx"]))
+            for row in pt_phi_filteridx:
+                f_0.write(" ".join(map(str, row)) + "\n")
 
-        # write to txt files
+            eta_pdg_id = np.vstack((event_data["eta"], event_data["pdg_id"]))
+            for row in eta_pdg_id:
+                f_1.write(" ".join(map(str, row)) + "\n")
 
-        if stacked:
-            eta_phi = np.vstack([eta, phi])
-            np.savetxt(config.AIE_DATA + "/" + f'etaphi_11_plio_{plio_width}_if_{interface_width}.txt', eta_phi, delimiter=" ", fmt="%d")
+        f_0.close()
+        f_1.close()
 
-        else:
-            np.savetxt(config.AIE_DATA + "/" + f'eta_11_plio_{plio_width}_if_{interface_width}.txt', eta, delimiter=" ", fmt="%d")
-            np.savetxt(config.AIE_DATA + "/" + f'phi_11_plio_{plio_width}_if_{interface_width}.txt', phi, delimiter=" ", fmt="%d")
+
     
 def aie_compile_x86(env):
     os.chdir(config.AIE_X86)
@@ -69,6 +101,18 @@ def aie_compile_x86(env):
                     config.AIE_SRC + "/graph.cpp", 
                     "-workdir", 
                     config.WORK_X86], 
+                    env=env)
+    
+def aie_compile_baseline_x86(env):
+    os.chdir(config.AIE_X86_BASELINE)
+
+    subprocess.run(["aiecompiler", 
+                    "--target=x86sim", 
+                    "-I", 
+                    config.AIE_SRC_BASELINE,
+                    config.AIE_SRC_BASELINE + "/graph.cpp", 
+                    "-workdir", 
+                    config.WORK_X86_BASELINE], 
                     env=env)
 
 def aie_compile_hw(env):
@@ -113,6 +157,16 @@ def run_x86_simulator(env):
                     f"--pkg-dir={config.WORK_X86}", 
                     f"--input-dir={config.AIE_DATA}",
                     f"--output-dir={config.OUT_SIM_X86}"], 
+                    env=env)
+    
+def run_baseline_x86_simulator(env):
+    os.chdir(config.AIE_X86_BASELINE)
+
+    subprocess.run(["x86simulator", 
+                    "--dump",
+                    f"--pkg-dir={config.WORK_X86_BASELINE}", 
+                    f"--input-dir={config.AIE_DATA_BASELINE}",
+                    f"--output-dir={config.OUT_SIM_X86_BASELINE}"], 
                     env=env)
     
 def run_aiesimulator(env):
@@ -235,13 +289,16 @@ if __name__ == "__main__":
 
     # generate data for aie simulation
     # input_file = "l1Nano_WTo3Pion_PU200.hdf5"
-    # generate_txts(input_file, config.F_CONV_11, 64, 16, True)
+    # generate_txts(input_file, [0, 1, 2, 3, 4, 5, 6], 32, 16, ["boo0", "boo1"])
 
     # aie_compile_x86(env)
-    run_x86_simulator(env)
+    # run_x86_simulator(env)
 
-    # aie_compile_hw(env)
-    # run_aiesimulator(env)
+    # aie_compile_baseline_x86(env)
+    # run_baseline_x86_simulator(env)
+
+    aie_compile_hw(env)
+    run_aiesimulator(env)
 
     # aie_compile_baseline_hw(env)
     # run_baseline_aiesimulator(env)
