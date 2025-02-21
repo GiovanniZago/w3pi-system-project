@@ -1,11 +1,4 @@
-#include <adf.h>
-#include "aie_api/aie.hpp"
-#include "aie_api/aie_adf.hpp"
-#include <aie_api/utils.hpp>
 #include "kernels.h"
-#include <math.h>
-
-using namespace adf;
 
 void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
 {   
