@@ -215,6 +215,15 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
                 pt_hig_pt_target2 = pts_iso_filter[i2];
                 eta_hig_pt_target2 = etas_iso_filter[i2];
                 phi_hig_pt_target2 = phis_iso_filter[i2];
+                
+                d_eta_scalar = pt_hig_pt_target2 - eta_hig_pt_target0;
+                d_phi_scalar = pt_hig_pt_target2 - phi_hig_pt_target0;
+                d_phi_scalar = (d_phi_scalar <= PI) ? ((d_phi_scalar >= MPI) ? d_phi_scalar : d_phi_scalar + TWOPI) : d_phi_scalar + MTWOPI;
+
+                dr2_scalar = d_eta_scalar * d_eta_scalar + d_phi_scalar * d_phi_scalar;
+                dr2_float_scalar = dr2_scalar * F_CONV2;
+
+                if (dr2_float_scalar < MINDR2_ANGSEP_FLOAT) continue;
 
                 charge0 = (pdg_ids_iso_filter[i0] >= 4) ? ((pdg_ids_iso_filter[i0] == 4) ? -1 : 1) : ((pdg_ids_iso_filter[i0] == 2) ? -1 : 1);
                 charge1 = (pdg_ids_iso_filter[i1] >= 4) ? ((pdg_ids_iso_filter[i1] == 4) ? -1 : 1) : ((pdg_ids_iso_filter[i1] == 2) ? -1 : 1);

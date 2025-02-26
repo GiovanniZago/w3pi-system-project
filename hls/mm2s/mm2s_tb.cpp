@@ -6,9 +6,11 @@
 #include "ap_int.h"
 #include "src/mm2s.h"
 
+static const uint32_t NUM_EVENTS = 7;
+
 int main() 
 {
-    ap_int<64 * BLOCK_SIZE> mem[NUM_BLOCKS];
+    ap_int<64 * BLOCK_SIZE> mem[NUM_BLOCKS * NUM_EVENTS];
     hls::stream<qdma_axis<32,0,0,0>> s0, s1;
     
     // open binary data file 
@@ -22,106 +24,103 @@ int main()
 
     // start = event_idx * EV_SIZE * sizeof(ap_int<64>) means that we will skip the 
     // number of events specified by event_idx
-    const uint32_t event_idx = 1;
-    std::streampos start = event_idx * EV_SIZE * sizeof(ap_int<64>);
+    const uint32_t start_event_idx = 0;
+    std::streampos start = start_event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 
     // cast mem to a pointer to char and we fill it with EV_SIZE * no. of bytes occupied by an ap_int<64>
     // i.e. we fill mem with the data corresponding to an event
-    bin_file.read(reinterpret_cast<char*>(mem), EV_SIZE * sizeof(ap_int<64>));
+    bin_file.read(reinterpret_cast<char*>(mem), NUM_EVENTS * EV_SIZE * sizeof(ap_int<64>));
     bin_file.close();
-    
-    // execute the hls kernel
-    #ifdef __CSIM__
-    std::cout << "\n\n-------------------------- Kernel Debug Printfs --------------------------\n\n" << std::endl;
-    #endif 
 
-    uint32_t mem_offset = 0;
-    mm2s(mem, s0, s1, mem_offset);
-    
-    #ifdef __CSIM__
-    std::cout << "\n\n-------------------------- Reading out Streams --------------------------\n\n" << std::endl;
-    #endif
-    
-    // compare kernel output with golden output
+    uint16_t event_idx = 0;
 
-    // read pt and eta
-    std::cout << "pt" << "\t\t\t" << "eta" << std::endl;
-    std::cout << "---------------------------------" << std::endl;
-
-    for (unsigned int i = 0; i < (EV_SIZE / 2); i++) 
+    for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
     {
-        if (!s0.empty() && !s1.empty()) 
-        {
-            // pt is unsigned int16
-            qdma_axis<32,0,0,0> out_s0 = s0.read();
-            int32_t data_s0 = out_s0.data.to_int();
-            uint16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
-            uint16_t data_s0_1 = data_s0 & 0xFFFF; 
-            
-            // eta is signed int16
-            qdma_axis<32,0,0,0> out_s1 = s1.read();
-            int32_t data_s1 = out_s1.data.to_int();
-            int16_t data_s1_0 = (data_s1 >> 16) & 0xFFFF; 
-            int16_t data_s1_1 = data_s1 & 0xFFFF; 
+        std::cout << "-------------------------------- EVENT NO. " << event_idx << " --------------------------------" << std::endl;
+        mm2s(mem, s0, s1, block_offset);
 
-            std::cout << data_s0_0 << "\t" << data_s0_1 << "\t\t" << data_s1_0 << "\t" << data_s1_1 << std::endl;
-
-        } else 
+        // read pt and eta
+        std::cout << "pt" << "\t\t\t" << "eta" << std::endl;
+        std::cout << "---------------------------------" << std::endl;
+    
+        for (unsigned int i = 0; i < (EV_SIZE / 2); i++) 
         {
-            std::cerr << "Error: Stream underflow at index " << i << std::endl;
-            return 1;
+            if (!s0.empty() && !s1.empty()) 
+            {
+                // pt is unsigned int16
+                qdma_axis<32,0,0,0> out_s0 = s0.read();
+                int32_t data_s0 = out_s0.data.to_int();
+                uint16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
+                uint16_t data_s0_1 = data_s0 & 0xFFFF; 
+                
+                // eta is signed int16
+                qdma_axis<32,0,0,0> out_s1 = s1.read();
+                int32_t data_s1 = out_s1.data.to_int();
+                int16_t data_s1_0 = (data_s1 >> 16) & 0xFFFF; 
+                int16_t data_s1_1 = data_s1 & 0xFFFF; 
+    
+                std::cout << data_s0_0 << "\t" << data_s0_1 << "\t\t" << data_s1_0 << "\t" << data_s1_1 << std::endl;
+    
+            } else 
+            {
+                std::cerr << "Error: Stream underflow at index " << i << std::endl;
+                return 1;
+            }
         }
+    
+        // read phi and pdg_id
+        std::cout << "phi" << "\t\t\t" << "pdg_id" << std::endl;
+        std::cout << "---------------------------------" << std::endl;
+    
+        for (unsigned int i = 0; i < (EV_SIZE / 2); i++) 
+        {
+            if (!s0.empty() && !s1.empty()) 
+            {
+                // phi is singed int16
+                qdma_axis<32,0,0,0> out_s0 = s0.read();
+                int32_t data_s0 = out_s0.data.to_int();
+                int16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
+                int16_t data_s0_1 = data_s0 & 0xFFFF; 
+                
+                // pdg_id is unsigned int16
+                qdma_axis<32,0,0,0> out_s1 = s1.read();
+                int32_t data_s1 = out_s1.data.to_int();
+                uint16_t data_s1_0 = (data_s1 >> 16) & 0xFFFF; 
+                uint16_t data_s1_1 = data_s1 & 0xFFFF; 
+    
+                std::cout << data_s0_0 << "\t" << data_s0_1 << "\t\t" << data_s1_0 << "\t" << data_s1_1 << std::endl;
+            } else 
+            {
+                std::cerr << "Error: Stream underflow at index " << i << std::endl;
+                return 1;
+            }
+        }
+    
+        // read is_filter_idx
+        std::cout << "is_filter_idx" << std::endl;
+        std::cout << "---------------------------------" << std::endl;
+    
+        for (unsigned int i = 0; i < (N_MIN / 2); i++)
+        {
+            if (!s0.empty()) 
+            {
+                qdma_axis<32,0,0,0> out_s0 = s0.read();
+                int32_t data_s0 = out_s0.data.to_int();
+                int16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
+                int16_t data_s0_1 = data_s0 & 0xFFFF;
+                
+                std::cout << data_s0_0 << "\t" << data_s0_1 << std::endl;
+            } else 
+            {
+                std::cerr << "Error: Stream (s0) underflow at index " << i << std::endl;
+                return 1;
+            }
+        }
+
+        event_idx++;
     }
 
-    // read phi and pdg_id
-    std::cout << "phi" << "\t\t\t" << "pdg_id" << std::endl;
-    std::cout << "---------------------------------" << std::endl;
-
-    for (unsigned int i = 0; i < (EV_SIZE / 2); i++) 
-    {
-        if (!s0.empty() && !s1.empty()) 
-        {
-            // phi is singed int16
-            qdma_axis<32,0,0,0> out_s0 = s0.read();
-            int32_t data_s0 = out_s0.data.to_int();
-            int16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
-            int16_t data_s0_1 = data_s0 & 0xFFFF; 
-            
-            // pdg_id is unsigned int16
-            qdma_axis<32,0,0,0> out_s1 = s1.read();
-            int32_t data_s1 = out_s1.data.to_int();
-            uint16_t data_s1_0 = (data_s1 >> 16) & 0xFFFF; 
-            uint16_t data_s1_1 = data_s1 & 0xFFFF; 
-
-            std::cout << data_s0_0 << "\t" << data_s0_1 << "\t\t" << data_s1_0 << "\t" << data_s1_1 << std::endl;
-        } else 
-        {
-            std::cerr << "Error: Stream underflow at index " << i << std::endl;
-            return 1;
-        }
-    }
-
-    // read is_filter_idx
-    std::cout << "is_filter_idx" << std::endl;
-    std::cout << "---------------------------------" << std::endl;
-
-    for (unsigned int i = 0; i < (N_MIN / 2); i++)
-    {
-        if (!s0.empty()) 
-        {
-            qdma_axis<32,0,0,0> out_s0 = s0.read();
-            int32_t data_s0 = out_s0.data.to_int();
-            int16_t data_s0_0 = (data_s0 >> 16) & 0xFFFF; 
-            int16_t data_s0_1 = data_s0 & 0xFFFF;
-            
-            std::cout << data_s0_0 << "\t" << data_s0_1 << std::endl;
-        } else 
-        {
-            std::cerr << "Error: Stream (s0) underflow at index " << i << std::endl;
-            return 1;
-        }
-    }
     
     return 0;
 }

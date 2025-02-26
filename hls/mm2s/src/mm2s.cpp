@@ -1,4 +1,15 @@
-#include "mm2s.h"
+#include <ap_int.h>
+#include <hls_stream.h>
+#include <ap_axi_sdata.h>
+
+#define EV_SIZE 224
+#define BLOCK_SIZE 16
+#define NUM_BLOCKS EV_SIZE / BLOCK_SIZE 
+#define N_MIN 16
+
+#define MIN_PT 28
+#define MED_PT 48
+#define HIG_PT 60
 
 extern "C" {
 

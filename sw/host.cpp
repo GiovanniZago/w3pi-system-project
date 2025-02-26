@@ -7,14 +7,18 @@ SPDX-License-Identifier: X11
 #include <cstring>
 #include <iostream>
 
+#include "ap_int.h"
 #include "experimental/xrt_kernel.h"
 #include "experimental/xrt_graph.h"
 #include "data.h" // contains input and golden output data 
 
-static const int NUM_PARTICLES = 128;
-static const int NUM_MEM_READ  = 64;  // input: we have to transfer 256 x 16b variables by reading 64b chunks from memory -> 64 reads
-static const int NUM_MEM_WRITE = 128; // output: we have to transfer 128 x 32b variables by reading 32b chunks from AI Engine -> 128 writes
-							         
+#define EV_SIZE 224
+#define BLOCK_SIZE 16
+#define NUM_BLOCKS EV_SIZE / BLOCK_SIZE 
+
+#define TRIPLET_VSIZE 4
+
+static const int NUM_EVENTS = 7;
 
 int main(int argc, char* argv[])
 {
@@ -33,61 +37,75 @@ int main(int argc, char* argv[])
 
 	// allocate buffer for the input of the two mm2s kernels	
 	std::cout << "Allocating buffers for kernel arguments" << std::endl;
-	auto in11_bo  = xrt::bo(device, 2 * NUM_PARTICLES * sizeof(int16_t), xrt::bo::flags::normal, mm2s.group_id(0));
-	auto out11_bo = xrt::bo(device,     NUM_PARTICLES * sizeof(int32_t), xrt::bo::flags::normal, s2mm.group_id(0));
+	auto events_buf   = xrt::bo(device, NUM_EVENTS * EV_SIZE * sizeof(int64_t)      , xrt::bo::flags::normal, mm2s.group_id(0));
+	auto triplets_buf = xrt::bo(device, NUM_EVENTS * TRIPLET_VSIZE * sizeof(int32_t), xrt::bo::flags::normal, s2mm.group_id(0));
 
-	// write buffer content and transfer buffer data from host to device	
+	// allocate and sync buffer with events data into the device memory	
 	std::cout << "Write input buffer content and transfer to device" << std::endl;
-	in11_bo.write(input11);
-	in11_bo.sync(XCL_BO_SYNC_BO_TO_DEVICE);
+
+	// open stream with data inside the file
+    std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
+
+    if (!bin_file) 
+    {
+        std::cerr << "Error: Unable to open input binary file" << std::endl;
+        return 1;
+    }
+
+    // set the start position of the stream to a specific event
+    const uint32_t start_event_idx = 0;
+    std::streampos start = start_event_idx * EV_SIZE * sizeof(ap_int<64>);
+    bin_file.seekg(start, std::ios::beg);
+
+    // fill array with data for a predefined number of events
+	ap_int<64 * BLOCK_SIZE> mem[NUM_EVENTS * NUM_BLOCKS];
+    bin_file.read(reinterpret_cast<char*>(mem), NUM_EVENTS * EV_SIZE * sizeof(ap_int<64>));
+    bin_file.close();
+
+	// write and sync the array to the device
+	events_buf.write(mem);
+	events_buf.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
 	// create run instances of the kernels
-	std::cout << "Starting the kernels" << std::endl;
-	auto mm2s_run = mm2s(in11_bo,  nullptr, NUM_MEM_READ );
-	auto s2mm_run = s2mm(out11_bo, nullptr, NUM_MEM_WRITE);
+	auto mm2s_run = xrt::run(mm2s);
+	auto s2mm_run = xrt::run(s2mm);
 
-	// wait for kernels to be done
-	mm2s_run.wait();
-	std::cout << "mm2s kernels executed" << std::endl;
+	int triplet_offset = 0;
 
-	// // obtain the graph handle from the XCLBIN that is loaded into the device
-	// auto myGraph = xrt::graph(device, xclbin_uuid, "Dr2Graph");
-	
-	// // run th graph for 1 iteration
-	// std::cout << "Running 1 iteration of the ADF graph" << std::endl;
-	// myGraph.run(1);
-	
-	// // graph end
-	// myGraph.end();
-	
-	// read output buffer content from device to host
-	int32_t dr2Output[NUM_PARTICLES];
-	s2mm_run.wait();
-	out11_bo.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
-	out11_bo.read(dr2Output);
-	std::cout << "ADF graph iteration is over" << std::endl;
-	
-	//////////////////////////////////////////
-	// Comparing the execution data to the golden data
-	//////////////////////////////////////////	
-	
-	int error11_count = 0;
+	for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
 	{
-		for (int i=0; i<NUM_PARTICLES; i++)
-		{
-				if (dr2Output[i] != out11_golden[i])
-				{
-					printf("OUT11 ERROR found @ %d, %d != %d\n", i, dr2Output[i], out11_golden[i]);
-					error11_count++;
-				}
-		}
+		mm2s_run.set_arg(0, events_buf);
+		mm2s_run.set_arg(1, nullptr);
+		mm2s_run.set_arg(2, nullptr);
+		mm2s_run.set_arg(3, block_offset);
+		
+		s2mm_run.set_arg(0, triplets_buf);
+		s2mm_run.set_arg(1, nullptr);
+		s2mm_run.set_arg(2, triplet_offset);
 
-		if (error11_count)
-			printf("11-bit computation encountered %d errors\n", error11_count);
-		else
-			printf("11-bit TEST PASSED\n");
+		mm2s_run.start();
+		s2mm_run.start();
+
+		mm2s_run.wait();
+		std::cout << "mm2s kernels executed" << std::endl;
+		
+		s2mm_run.wait();
+		std::cout << "s2mm kernels executed" << std::endl;
+
+		triplet_offset += TRIPLET_VSIZE;
 	}
+
+	// read output buffer content from device to host
+	float triplets[NUM_EVENTS * TRIPLET_VSIZE];
+	triplets_buf.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
+	triplets_buf.read(triplets);
+	std::cout << "Finished executing W3Pi on the input events" << std::endl;
 	
+	// print out the output
+	for (unsigned int i = 0; i < NUM_EVENTS * TRIPLET_VSIZE)
+	{
+		std::cout << triplets[i] << std::endl;
+	}
     
 	std::cout << "Releasing remaining XRT objects...\n";
 	

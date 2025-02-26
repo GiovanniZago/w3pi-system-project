@@ -202,12 +202,14 @@ def hls_compile(env, kernel_name):
                     "-k",
                     f"{kernel_name}",
                     "-o", 
-                    f"{kernel_name}.hw_emu.xo", 
-                    f"{config.HLS}/{kernel_name}.cpp"], 
+                    f"{config.HLS}/{kernel_name}/{config.TARGET}/{kernel_name}.{config.TARGET}.xo", 
+                    f"{config.HLS}/{kernel_name}/src/{kernel_name}.cpp"], 
                     env=env)
 
 def link_system(env):
     os.chdir(config.LINK)
+
+    aie_dir = "x86" if config.TARGET == "sw_emu" else "hw"
 
     subprocess.run(["v++", 
                     "-g", # debug flag
@@ -216,11 +218,11 @@ def link_system(env):
                     config.TARGET, 
                     "--platform", 
                     f"{config.XILINX_VCK5000_GEN4X8_XDMA}", 
-                    f"{config.HLS}/mm2s.hw_emu.xo", 
-                    f"{config.HLS}/s2mm.hw_emu.xo", 
-                    f"{config.AIE_HW}/libadf.a", 
+                    f"{config.HLS}/mm2s/{config.TARGET}/mm2s.{config.TARGET}.xo", 
+                    f"{config.HLS}/s2mm/{config.TARGET}/s2mm.{config.TARGET}.xo", 
+                    f"{config.AIE}/{aie_dir}/libadf.a", 
                     "-o", 
-                    "out.xsa", 
+                    f"out.{config.TARGET}.xsa", 
                     "--save-temps",
                     "-j", # to speed up computation
                     "4",
@@ -231,24 +233,36 @@ def link_system(env):
 def package_system(env):
     os.chdir(config.PACKAGE)
 
+    aie_dir = "x86" if config.TARGET == "sw_emu" else "hw"
+
     subprocess.run(["v++",
                     "-g", # debug flag
-                    "-p", # package flag
+                    "--package", # package flag
                     "-t",
                     config.TARGET, 
                     "--platform", 
-                    config.XILINX_VCK5000_GEN4X8_XDMA, 
+                    f"{config.XILINX_VCK5000_GEN4X8_XDMA}", 
+                    f"{config.LINK}/out.{config.TARGET}.xsa", 
+                    f"{config.AIE}/{aie_dir}/libadf.a", 
                     "--package.boot_mode=ospi",
-                    f"{config.LINK}/out.xsa", 
-                    f"{config.AIE_HW}/libadf.a", 
                     "-o", 
                     "output.xclbin"], 
                     env=env)
 
 def sw_compile(env):
     os.chdir(config.SW)
+    
+    if config.TARGET == "sw_emu":
+        exec_path = config.SW_EMU
 
-    exec_path = config.HW_EMU if config.TARGET == "hw_emu" else config.HW_RUN
+    elif config.TARGET == "hw_emu":
+        exec_path = config.HW_EMU
+
+    elif config.TARGET == "hw":
+        exec_path = config.HW_RUN
+
+    else:
+        print("Please configure target")
 
     subprocess.run(["g++", 
                     "-std=c++17", 
@@ -294,21 +308,15 @@ if __name__ == "__main__":
     # aie_compile_x86(env)
     # run_x86_simulator(env)
 
-    # aie_compile_baseline_x86(env)
-    # run_baseline_x86_simulator(env)
-
-    aie_compile_hw(env)
-    run_aiesimulator(env)
-
-    # aie_compile_baseline_hw(env)
-    # run_baseline_aiesimulator(env)
+    # aie_compile_hw(env)
+    # run_aiesimulator(env)
 
     # hls_compile(env, "mm2s")
     # hls_compile(env, "s2mm")
 
     # link_system(env)
 
-    # package_system(env)
+    package_system(env)
 
     # sw_compile(env)
 
