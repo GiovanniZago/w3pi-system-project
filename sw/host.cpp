@@ -18,7 +18,7 @@ SPDX-License-Identifier: X11
 
 #define TRIPLET_VSIZE 4
 
-static const int NUM_EVENTS = 7;
+static const int NUM_EVENTS = 1;
 
 int main(int argc, char* argv[])
 {
@@ -37,8 +37,8 @@ int main(int argc, char* argv[])
 
 	// allocate buffer for the input of the two mm2s kernels	
 	std::cout << "Allocating buffers for kernel arguments" << std::endl;
-	auto events_buf   = xrt::bo(device, NUM_EVENTS * EV_SIZE * sizeof(int64_t)      , xrt::bo::flags::normal, mm2s.group_id(0));
-	auto triplets_buf = xrt::bo(device, NUM_EVENTS * TRIPLET_VSIZE * sizeof(int32_t), xrt::bo::flags::normal, s2mm.group_id(0));
+	auto events_buf   = xrt::bo(device, NUM_EVENTS * EV_SIZE * sizeof(int64_t)           , xrt::bo::flags::normal, mm2s.group_id(0));
+	auto triplets_buf = xrt::bo(device, NUM_EVENTS * TRIPLET_VSIZE * sizeof(ap_uint<32>) , xrt::bo::flags::normal, s2mm.group_id(0));
 
 	// allocate and sync buffer with events data into the device memory	
 	std::cout << "Write input buffer content and transfer to device" << std::endl;
@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
     }
 
     // set the start position of the stream to a specific event
-    const uint32_t start_event_idx = 0;
+    const uint32_t start_event_idx = 1;
     std::streampos start = start_event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 
@@ -67,44 +67,54 @@ int main(int argc, char* argv[])
 	events_buf.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
 	// create run instances of the kernels
-	auto mm2s_run = xrt::run(mm2s);
-	auto s2mm_run = xrt::run(s2mm);
+	// auto mm2s_run = xrt::run(mm2s);
+	// auto s2mm_run = xrt::run(s2mm);
 
-	int triplet_offset = 0;
+	// int triplet_offset = 0;
 
-	for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
-	{
-		mm2s_run.set_arg(0, events_buf);
-		mm2s_run.set_arg(1, nullptr);
-		mm2s_run.set_arg(2, nullptr);
-		mm2s_run.set_arg(3, block_offset);
+	// for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
+	// {
+	// 	mm2s_run.set_arg(0, events_buf);
+	// 	mm2s_run.set_arg(1, nullptr);
+	// 	mm2s_run.set_arg(2, nullptr);
+	// 	mm2s_run.set_arg(3, block_offset);
 		
-		s2mm_run.set_arg(0, triplets_buf);
-		s2mm_run.set_arg(1, nullptr);
-		s2mm_run.set_arg(2, triplet_offset);
+	// 	s2mm_run.set_arg(0, triplets_buf);
+	// 	s2mm_run.set_arg(1, nullptr);
+	// 	s2mm_run.set_arg(2, triplet_offset);
 
-		mm2s_run.start();
-		s2mm_run.start();
+	// 	mm2s_run.start();
+	// 	s2mm_run.start();
 
-		mm2s_run.wait();
-		std::cout << "mm2s kernels executed" << std::endl;
+	// 	mm2s_run.wait();
+	// 	std::cout << "mm2s kernels executed" << std::endl;
 		
-		s2mm_run.wait();
-		std::cout << "s2mm kernels executed" << std::endl;
+	// 	s2mm_run.wait();
+	// 	std::cout << "s2mm kernels executed" << std::endl;
 
-		triplet_offset += TRIPLET_VSIZE;
-	}
+	// 	triplet_offset += TRIPLET_VSIZE;
+	// } 
+
+	auto mm2s_run = mm2s(events_buf, nullptr, nullptr, 0);
+	auto s2mm_run = s2mm(triplets_buf, nullptr, 0);
+
+	mm2s_run.wait();
+	std::cout << "mm2s kernels executed" << std::endl;
+
+	s2mm_run.wait();
+	std::cout << "s2mm kernels executed" << std::endl;
 
 	// read output buffer content from device to host
-	float triplets[NUM_EVENTS * TRIPLET_VSIZE];
+	ap_uint<32> triplets[NUM_EVENTS * TRIPLET_VSIZE];
 	triplets_buf.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 	triplets_buf.read(triplets);
 	std::cout << "Finished executing W3Pi on the input events" << std::endl;
 	
 	// print out the output
-	for (unsigned int i = 0; i < NUM_EVENTS * TRIPLET_VSIZE)
+	for (unsigned int i = 0; i < NUM_EVENTS * TRIPLET_VSIZE; i++)
 	{
-		std::cout << triplets[i] << std::endl;
+		float val = *reinterpret_cast<float*>(&triplets[i]);
+		std::cout << val << std::endl;
 	}
     
 	std::cout << "Releasing remaining XRT objects...\n";

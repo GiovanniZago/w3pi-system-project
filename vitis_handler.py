@@ -268,11 +268,13 @@ def sw_compile(env):
                     "-std=c++17", 
                     "-g", # debug flag
                     f"-I{config.XRT_INCLUDE}",
+                    f"-I{config.HLS_INCLUDE}",
                     "-I./", 
                     f"host.cpp", 
                     "-o", 
                     f"{exec_path}/host.o", 
                     f"-L{config.XRT_LIB}", 
+                    f"-L{config.HLS_LIB}",
                     "-lxrt_coreutil", 
                     "-pthread"],
                     env=env)
@@ -308,15 +310,15 @@ if __name__ == "__main__":
     # aie_compile_x86(env)
     # run_x86_simulator(env)
 
-    # aie_compile_hw(env)
-    # run_aiesimulator(env)
+    aie_compile_hw(env)
+    run_aiesimulator(env)
 
     # hls_compile(env, "mm2s")
     # hls_compile(env, "s2mm")
 
     # link_system(env)
 
-    package_system(env)
+    # package_system(env)
 
     # sw_compile(env)
 
