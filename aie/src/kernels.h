@@ -1,6 +1,7 @@
 #include <adf.h>
 #include "aie_api/aie.hpp"
 #include "aie_api/aie_adf.hpp"
+#include "aie_api/utils.hpp"
 
 #ifndef FUNCTION_KERNELS_H
 #define FUNCTION_KERNELS_H
@@ -43,6 +44,7 @@ static const float MASS_P = 0.13957039;
 
 using namespace adf;
 
-void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out);
+void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<int32> * __restrict out);
+void test(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<int32> * __restrict out);
 
 #endif

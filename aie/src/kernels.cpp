@@ -1,6 +1,6 @@
 #include "kernels.h"
 
-void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<float> * __restrict out)
+void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict in1, output_stream<int32> * __restrict out)
 {   
     #if defined(__X86DEBUG__)
     printf("----- PROCESSING EVENT -----\n");
@@ -166,6 +166,7 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     // vector that stores the triplet information
     // idx0, idx1, idx2, invariant mass
     aie::vector<float, 4> triplet = aie::zeros<float, 4>();
+    aie::vector<int32, 4> triplet_int = aie::zeros<int32, 4>();
 
     // loop exit flag
     bool exitLoop = false;
@@ -282,5 +283,6 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
         if (exitLoop) break;
     }
 
-    writeincr(out, triplet);
+    triplet_int = triplet.cast_to<int32>();
+    writeincr(out, triplet_int);
 }

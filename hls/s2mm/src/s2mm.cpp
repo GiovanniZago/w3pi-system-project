@@ -8,7 +8,7 @@
 extern "C"
 {
 
-void s2mm(ap_uint<32>* mem, hls::stream<qdma_axis<32,0,0,0>>& s, int mem_offset) 
+void s2mm(ap_int<32>* mem, hls::stream<qdma_axis<32,0,0,0>>& s, int mem_offset) 
 {
 
 #pragma HLS INTERFACE m_axi port=mem offset=slave bundle=gmem

@@ -85,8 +85,8 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	{
 		#pragma HLS PIPELINE II=1
 
-		x_pt.data = (pt[j], pt[j + 1]);
-		x_eta.data = (eta[j], eta[j + 1]);
+		x_pt.data = (pt[j + 1], pt[j]);
+		x_eta.data = (eta[j + 1], eta[j]);
 
 		x_pt.keep_all();
 		x_eta.keep_all();
@@ -99,8 +99,8 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	{
 		#pragma HLS PIPELINE II=1
 
-		x_phi.data = (phi[j], phi[j + 1]);
-		x_pdg_id.data = (pdg_id[j], pdg_id[j + 1]);
+		x_phi.data = (phi[j + 1], phi[j]);
+		x_pdg_id.data = (pdg_id[j + 1], pdg_id[j]);
 
 		x_phi.keep_all();
 		x_pdg_id.keep_all();
@@ -115,7 +115,7 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	{
 		#pragma HLS PIPELINE II=1
 
-		x_is_filter.data = (is_filter[j], is_filter[j + 1]);
+		x_is_filter.data = (is_filter[j + 1], is_filter[j]);
 		x_is_filter.keep_all();
 		s0.write(x_is_filter);
 	}

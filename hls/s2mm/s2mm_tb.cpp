@@ -14,11 +14,11 @@ int main()
     for (unsigned int i = 0; i < TRIPLET_VSIZE; i++)
     {
         qdma_axis<32,0,0,0> temp;
-        temp.set_data(*reinterpret_cast<ap_uint<32>*>(&input_triplet[i]));
+        temp.set_data(*reinterpret_cast<ap_int<32>*>(&input_triplet[i]));
         s.write(temp);
     }
 
-    ap_uint<32> output_triplet[TRIPLET_VSIZE];
+    ap_int<32> output_triplet[TRIPLET_VSIZE];
     s2mm(output_triplet, s, 0);
 
     for (unsigned int i = 0; i < TRIPLET_VSIZE; i++)
