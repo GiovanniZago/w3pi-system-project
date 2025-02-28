@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
     }
 
     // set the start position of the stream to a specific event
-    const uint32_t start_event_idx = 0;
+    const uint32_t start_event_idx = 3564;
     std::streampos start = start_event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 
@@ -74,70 +74,45 @@ int main(int argc, char* argv[])
 	auto dt_allocate = std::chrono::duration<double, std::milli>(end_allocate - start_allocate).count();
 
 	// create run instances of the kernels
-	std::cout << "Creating run instances of the kernels" << std::endl;
-	auto mm2s_run = xrt::run(mm2s);
-	auto s2mm_run = xrt::run(s2mm);
 
-	int triplet_offset = 0;
-	uint event_idx = 0;
+	auto start_mm2s = std::chrono::high_resolution_clock::now();
+	auto mm2s_run = mm2s(events_buf, nullptr, nullptr);
+	auto s2mm_run = s2mm(triplets_buf, nullptr);
+	
+	mm2s_run.wait();
+	std::cout << "mm2s kernels executed" << std::endl;
+	
+	s2mm_run.wait();
+	auto end_s2mm = std::chrono::high_resolution_clock::now();
+	std::cout << "s2mm kernels executed" << std::endl;
 
-	auto start_exec = std::chrono::high_resolution_clock::now();
-	for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
-	{
-		// std::cout << "----- EVENT " << event_idx << " -----" << std::endl;
-		// std::cout << "Setting args for mm2s" << std::endl;
-		mm2s_run.set_arg(0, events_buf);
-		mm2s_run.set_arg(1, nullptr);
-		mm2s_run.set_arg(2, nullptr);
-		mm2s_run.set_arg(3, block_offset);
-		
-		// std::cout << "Setting args for s2mm" << std::endl;
-		s2mm_run.set_arg(0, triplets_buf);
-		s2mm_run.set_arg(1, nullptr);
-		s2mm_run.set_arg(2, triplet_offset);
-
-		// std::cout << "Starting mm2s" << std::endl;
-		mm2s_run.start();
-		// std::cout << "Starting s2mm" << std::endl;
-		s2mm_run.start();
-
-		mm2s_run.wait();
-		// std::cout << "mm2s kernels executed" << std::endl;
-		
-		s2mm_run.wait();
-		// std::cout << "s2mm kernels executed" << std::endl;
-
-		triplet_offset += TRIPLET_VSIZE;
-		event_idx++;
-	} 
-
-	auto end_exec = std::chrono::high_resolution_clock::now();
-	auto dt_exec = std::chrono::duration<double, std::milli>(end_exec - start_exec).count();
-
-	// auto mm2s_run = mm2s(events_buf, nullptr, nullptr, 0);
-	// auto s2mm_run = s2mm(triplets_buf, nullptr, 0);
-
-	// mm2s_run.wait();
-	// std::cout << "mm2s kernels executed" << std::endl;
-
-	// s2mm_run.wait();
-	// std::cout << "s2mm kernels executed" << std::endl;
+	auto dt_exec = std::chrono::duration<double, std::milli>(end_s2mm - start_mm2s).count();
 
 	// read output buffer content from device to host
 	int32_t triplets[NUM_EVENTS * TRIPLET_VSIZE];
+	auto start_readout = std::chrono::high_resolution_clock::now();
 	triplets_buf.sync(XCL_BO_SYNC_BO_FROM_DEVICE);
 	triplets_buf.read(triplets);
+	auto end_readout = std::chrono::high_resolution_clock::now();
+	auto dt_readout = std::chrono::duration<double, std::milli>(end_readout - start_readout).count();
 	std::cout << "Finished executing W3Pi on the input events" << std::endl;
 	
 	// print out the output
+	uint32_t event_counter = 0;
 	for (unsigned int i = 0; i < NUM_EVENTS * TRIPLET_VSIZE; i++)
 	{
+		if (i % TRIPLET_VSIZE == 0)
+		{
+			std::cout << "--------- EVENT NO. " << event_counter << " ---------" << std::endl;
+			event_counter++;
+		}
 		float val = *reinterpret_cast<float*>(&triplets[i]);
 		std::cout << val << std::endl;
 	}
 
 	std::cout << "Allocation time: " << dt_allocate << " ms" << std::endl;
 	std::cout << "Execuion time: " << dt_exec << " ms" << std::endl;
+	std::cout << "Readout time: " << dt_readout << " ms" << std::endl;
     
 	std::cout << "Releasing remaining XRT objects...\n";
 	

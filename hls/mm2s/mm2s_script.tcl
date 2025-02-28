@@ -8,7 +8,7 @@ open_solution -reset -flow_target vitis "solution"
 set_part {xcvc1902-vsvd1760-2MP-e-S}
 create_clock -period 2.777 
 
-csim_design -clean 
-# csynth_design -dump_post_cfg
-# export_design -format xo
+# csim_design -clean 
+csynth_design -dump_post_cfg
+export_design -format xo
 exit

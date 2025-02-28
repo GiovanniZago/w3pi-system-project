@@ -9,6 +9,7 @@
 #define BLOCK_SIZE 16
 #define NUM_BLOCKS EV_SIZE / BLOCK_SIZE 
 #define N_MIN 16
+#define NUM_EVENTS 3564
 
 #define MIN_PT 28
 #define MED_PT 48
@@ -19,7 +20,7 @@
 extern "C" 
 {
 
-void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hls::stream<qdma_axis<32,0,0,0>>& s1, int mem_offset);
+void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hls::stream<qdma_axis<32,0,0,0>>& s1);
 
 }
 
