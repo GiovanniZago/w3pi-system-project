@@ -322,6 +322,6 @@ if __name__ == "__main__":
 
     # sw_compile(env)
 
-    run_hw_emu(env)
+    # run_hw_emu(env)
 
-    # run_hw(env)
+    run_hw(env)

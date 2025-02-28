@@ -6,6 +6,7 @@ SPDX-License-Identifier: X11
 #include <fstream>
 #include <cstring>
 #include <iostream>
+#include <chrono>
 
 #include "ap_int.h"
 #include "experimental/xrt_kernel.h"
@@ -18,7 +19,7 @@ SPDX-License-Identifier: X11
 
 #define TRIPLET_VSIZE 4
 
-static const int NUM_EVENTS = 7;
+static const int NUM_EVENTS = 3564;
 
 int main(int argc, char* argv[])
 {
@@ -41,7 +42,7 @@ int main(int argc, char* argv[])
 	auto triplets_buf = xrt::bo(device, NUM_EVENTS * TRIPLET_VSIZE * sizeof(ap_int<32>) , xrt::bo::flags::normal, s2mm.group_id(0));
 
 	// allocate and sync buffer with events data into the device memory	
-	std::cout << "Write input buffer content and transfer to device" << std::endl;
+	std::cout << "Opening binary file with input data" << std::endl;
 
 	// open stream with data inside the file
     std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
@@ -63,37 +64,55 @@ int main(int argc, char* argv[])
     bin_file.close();
 
 	// write and sync the array to the device
+	std::cout << "Writing data into device memory" << std::endl;
+	auto start_allocate = std::chrono::high_resolution_clock::now();
+
 	events_buf.write(mem);
 	events_buf.sync(XCL_BO_SYNC_BO_TO_DEVICE);
 
+	auto end_allocate = std::chrono::high_resolution_clock::now();
+	auto dt_allocate = std::chrono::duration<double, std::milli>(end_allocate - start_allocate).count();
+
 	// create run instances of the kernels
+	std::cout << "Creating run instances of the kernels" << std::endl;
 	auto mm2s_run = xrt::run(mm2s);
 	auto s2mm_run = xrt::run(s2mm);
 
 	int triplet_offset = 0;
+	uint event_idx = 0;
 
+	auto start_exec = std::chrono::high_resolution_clock::now();
 	for (unsigned int block_offset = 0; block_offset < NUM_BLOCKS * NUM_EVENTS; block_offset += NUM_BLOCKS)
 	{
+		// std::cout << "----- EVENT " << event_idx << " -----" << std::endl;
+		// std::cout << "Setting args for mm2s" << std::endl;
 		mm2s_run.set_arg(0, events_buf);
 		mm2s_run.set_arg(1, nullptr);
 		mm2s_run.set_arg(2, nullptr);
 		mm2s_run.set_arg(3, block_offset);
 		
+		// std::cout << "Setting args for s2mm" << std::endl;
 		s2mm_run.set_arg(0, triplets_buf);
 		s2mm_run.set_arg(1, nullptr);
 		s2mm_run.set_arg(2, triplet_offset);
 
+		// std::cout << "Starting mm2s" << std::endl;
 		mm2s_run.start();
+		// std::cout << "Starting s2mm" << std::endl;
 		s2mm_run.start();
 
 		mm2s_run.wait();
-		std::cout << "mm2s kernels executed" << std::endl;
+		// std::cout << "mm2s kernels executed" << std::endl;
 		
 		s2mm_run.wait();
-		std::cout << "s2mm kernels executed" << std::endl;
+		// std::cout << "s2mm kernels executed" << std::endl;
 
 		triplet_offset += TRIPLET_VSIZE;
+		event_idx++;
 	} 
+
+	auto end_exec = std::chrono::high_resolution_clock::now();
+	auto dt_exec = std::chrono::duration<double, std::milli>(end_exec - start_exec).count();
 
 	// auto mm2s_run = mm2s(events_buf, nullptr, nullptr, 0);
 	// auto s2mm_run = s2mm(triplets_buf, nullptr, 0);
@@ -116,6 +135,9 @@ int main(int argc, char* argv[])
 		float val = *reinterpret_cast<float*>(&triplets[i]);
 		std::cout << val << std::endl;
 	}
+
+	std::cout << "Allocation time: " << dt_allocate << " ms" << std::endl;
+	std::cout << "Execuion time: " << dt_exec << " ms" << std::endl;
     
 	std::cout << "Releasing remaining XRT objects...\n";
 	
