@@ -120,7 +120,10 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
             pt_sum    += aie::reduce_add(pt_to_sum); // update the pt sum
         }
 
-        if (pt_sum <= (pts[out_idx][in_idx] * MAX_ISO))
+        float pt_cur_float = fix2float(pts[out_idx][in_idx]);
+        int16 pt_sum_thresh = float2fix(pt_cur_float * MAX_ISO);
+
+        if (pt_sum <= pt_sum_thresh)
         {
             pts_iso_filter[i]     = pts[out_idx][in_idx];
             etas_iso_filter[i]    = etas[out_idx][in_idx];

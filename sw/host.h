@@ -16,7 +16,7 @@
 static const int NUM_EVENTS = 3564;
 
 static const bool DEBUG = false;
-static const bool PRINT_TIME = false;
+static const bool PRINT_TIME = true;
 
 void checkpoint(const std::string& flag, const bool debug_enabled) 
 {   

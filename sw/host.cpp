@@ -2,7 +2,6 @@
 
 int main(int argc, char* argv[])
 {
-
 	char* xclbinFile = argv[1];
 	
 	auto device = xrt::device(0);

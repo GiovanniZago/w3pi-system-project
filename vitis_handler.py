@@ -320,7 +320,7 @@ if __name__ == "__main__":
 
     # package_system(env)
 
-    # sw_compile(env)
+    sw_compile(env)
 
     # run_hw_emu(env)
 
