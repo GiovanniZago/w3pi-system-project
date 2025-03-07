@@ -6,7 +6,7 @@ W3PiGraph mygraph;
 
 int main(void) 
 {
-    int N_iter = 7;
+    int N_iter = 1;
 
     mygraph.init();
     mygraph.run(N_iter);

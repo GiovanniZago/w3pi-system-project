@@ -9,7 +9,7 @@
 #define BLOCK_SIZE 16
 #define NUM_BLOCKS EV_SIZE / BLOCK_SIZE 
 #define N_MIN 16
-#define NUM_EVENTS 3564
+#define NUM_EVENTS 1
 
 #define MIN_PT 28
 #define MED_PT 48

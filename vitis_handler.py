@@ -270,7 +270,7 @@ def sw_compile(env):
                     f"-I{config.XRT_INCLUDE}",
                     f"-I{config.HLS_INCLUDE}",
                     "-I./", 
-                    f"host.cpp", 
+                    f"host_full_dataset.cpp", 
                     "-o", 
                     f"{exec_path}/host.o", 
                     f"-L{config.XRT_LIB}", 
@@ -306,6 +306,7 @@ if __name__ == "__main__":
     # generate data for aie simulation
     # input_file = "l1Nano_WTo3Pion_PU200.hdf5"
     # generate_txts(input_file, [0, 1, 2, 3, 4, 5, 6], 32, 16, ["boo0", "boo1"])
+    # generate_txts(input_file, [10554], 32, 16, ["zoo0", "zoo1"])
 
     # aie_compile_x86(env)
     # run_x86_simulator(env)

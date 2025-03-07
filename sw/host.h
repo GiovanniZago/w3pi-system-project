@@ -14,9 +14,10 @@
 #define TRIPLET_VSIZE 4
 
 static const int NUM_EVENTS = 3564;
+static const int NUM_ORBITS = 14;
 
 static const bool DEBUG = false;
-static const bool PRINT_TIME = true;
+static const bool PRINT_TIME = false;
 
 void checkpoint(const std::string& flag, const bool debug_enabled) 
 {   

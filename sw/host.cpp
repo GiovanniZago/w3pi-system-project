@@ -30,7 +30,8 @@ int main(int argc, char* argv[])
     }
 
     // set the start position of the stream to a specific event
-    const uint32_t start_event_idx = 0;
+	const uint32_t orbit_idx = 6;
+    const uint32_t start_event_idx = orbit_idx * 3564;
     std::streampos start = start_event_idx * EV_SIZE * sizeof(ap_int<64>);
     bin_file.seekg(start, std::ios::beg);
 

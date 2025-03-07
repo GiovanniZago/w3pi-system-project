@@ -17,8 +17,8 @@ class W3PiGraph : public graph
         {
             w3pi_k = kernel::create(w3pi);
 
-            in0 = input_plio::create("in0", plio_32_bits, "boo0.txt", 360);
-            in1 = input_plio::create("in1", plio_32_bits, "boo1.txt", 360);
+            in0 = input_plio::create("in0", plio_32_bits, "zoo0.txt", 360);
+            in1 = input_plio::create("in1", plio_32_bits, "zoo1.txt", 360);
             out = output_plio::create("out", plio_32_bits, "out.txt", 360);
 
             // PL inputs
