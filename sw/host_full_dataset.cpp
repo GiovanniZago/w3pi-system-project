@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 	checkpoint("BUFFER_OBJECT", DEBUG);
 
 	// open out file in append mode
-	std::ofstream out_file("/home/giovanni/w3pi-system-project/results/l1Nano_WTo3Pion_PU200_hwreco_fulldata.csv", std::ios::app);
+	std::ofstream out_file("/home/giovanni/w3pi-system-project/results/l1Nano_SingleNeutrino_PU200_hwreco_fulldata.csv", std::ios::app);
 
 	if (!out_file) 
     {
@@ -36,7 +36,7 @@ int main(int argc, char* argv[])
 	{
 		std::cout << "------------- Processing Orbit: " << idx_orbit << " Start Evt Index: " << start_event_idx << " -------------" << std::endl;
 
-		std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
+		std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/puppi_SingleNeutrino_PU200.125X_v1.0.224.dump", std::ios::binary);
 
 		if (!bin_file) 
 		{

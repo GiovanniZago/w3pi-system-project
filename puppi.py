@@ -13,7 +13,7 @@ class PuppiData:
     line_size = 8 # each line is 8 bytes
     data_path = config.DATA
     head_columns = ["idx", "vld_header", "err_bit", "lr_number", "orbit_cnt", "bx_cnt", "n_cand"]
-    part_columns = ["idx", "pdg_id", "phi", "eta", "pt"]
+    part_columns = ["idx", "pid", "phi", "eta", "pt"]
 
 
     def __init__(self, file_name):
@@ -81,8 +81,8 @@ class PuppiData:
                                      header["orbit_cnt"], header["bx_cnt"], header["n_cand"]])
             else:
                 particle = self._unpack_particle(line_str)
-                if is_null: particle["pdg_id"] = 0
-                particles_data.append([idx, particle["pdg_id"], particle["phi"], particle["eta"], particle["pt"]])
+                if is_null: particle["pid"] = 0
+                particles_data.append([idx, particle["pid"], particle["phi"], particle["eta"], particle["pt"]])
                 
         return np.array(headers_data), np.array(particles_data)
 
@@ -149,187 +149,6 @@ class PuppiData:
                         is_header = True
                         p_counter = 0
 
-
-    def to_aiecsv(self):
-        if not self.file:
-            raise ValueError("File not opened. Call self.open_file() first or enter the context.")
-        
-        file_out_name_H = str.split(self.file_name, ".")[0] + "_H.csv"
-        file_out_name_L = str.split(self.file_name, ".")[0] + "_L.csv"
-        
-        with open(self.data_path + "/aie_data/" + file_out_name_H, "w") as puppi_csv_H:
-            with open(self.data_path + "/aie_data/" + file_out_name_L, "w") as puppi_csv_L:
-                puppi_csv_H.write("CMD,D,TLAST,TKEEP\n")
-                puppi_csv_L.write("CMD,D,TLAST,TKEEP\n")
-
-                while True:
-                    row_bytes = self.file.read(self.line_size)
-
-                    if not row_bytes:
-                        break
-
-                    row_data = struct.unpack("ii", row_bytes)
-                    puppi_csv_H.write("DATA," + f"{str(row_data[1])}," + "0," + "-1\n")
-                    puppi_csv_L.write("DATA," + f"{str(row_data[0])}," + "0," + "-1\n")
-
-    def to_aiecsv64(self):
-        if not self.file:
-            raise ValueError("File not opened. Call self.open_file() first or enter the context.")
-        
-        file_out_name = str.split(self.file_name, ".")[0] + ".csv"
-        
-        with open(self.data_path + "/aie_data/" + file_out_name, "w") as puppi_csv:
-            puppi_csv.write("CMD,D,TLAST,TKEEP\n")
-
-            while True:
-                row_bytes = self.file.read(self.line_size)
-
-                if not row_bytes:
-                    break
-
-                row_data = struct.unpack("q", row_bytes)
-                puppi_csv.write("DATA," + f"{str(row_data[0])}," + "0," + "-1\n")
-
-    def to_aiecsv64_unpacked(self):
-        if not self.file:
-            raise ValueError("File not opened. Call self.open_file() first or enter the context.")
-        
-        file_out_name = str.split(self.file_name, ".")[0] + "_unpacked.csv"
-        
-        with open(self.data_path + "/aie_data/" + file_out_name, "w") as puppi_csv:
-            puppi_csv.write("CMD,D,D,D,D,TLAST,TKEEP\n")
-
-            while True:
-                row_bytes = self.file.read(self.line_size)
-
-                if not row_bytes:
-                    break
-                
-                row_data = struct.unpack("q", row_bytes)
-
-                if row_data[0]:
-                    next_row_bytes = self.file.read(self.line_size) # reading the next line causes the cursor to advance of 8 bytes 
-                    next_row_data = struct.unpack("q", next_row_bytes)
-                    
-                    # check if the next line contains only a zero or if it contains data
-                    if next_row_data[0]:
-                        part_dict = self._unpack_particle(row_bytes)
-                        part_dict["pdg_id"] = self._get_raw_pdgid(part_dict["pdg_id"])
-                        puppi_csv.write("DATA," + f"{part_dict['pt']}," + f"{part_dict['eta']}," + f"{part_dict['phi']}," + f"{part_dict['pdg_id']}," + "0,-1\n")
-
-                    else:
-                        part_dict = self._unpack_particle(row_bytes)
-                        part_dict["pdg_id"] = self._get_raw_pdgid(part_dict["pdg_id"])
-                        puppi_csv.write("DATA," + f"{part_dict['pt']}," + f"{part_dict['eta']}," + f"{part_dict['phi']}," + f"{part_dict['pdg_id']}," + "1,-1\n") # assert tlast here
-
-                    self.file.seek(-8, 1) # put the curson of the file back to the previous position, namely shift it 8 bytes back
-
-    def to_hdf5(self, ev_size, has_headers=False):
-        if not self.file:
-            raise ValueError("File not opened. Call self.open_file() first or enter the context.")
-        
-        file_out_name = str.split(self.file_name, ".")[0] + ".hdf5"
-        
-        block_size = ev_size if (not has_headers) else ev_size + 1
-        foo = self.file_rows % block_size
-
-        if foo != 0:
-            raise ValueError("The number of rows in the file is not a multiple of block_size.")
-
-        n_events = int(self.file_rows / block_size)
-        
-        idxs_start = [x * block_size for x in range(n_events)]
-        idxs_end = [x * block_size for x in range(1, n_events+1)]
-        
-        with h5py.File(self.data_path + file_out_name, "w") as f:
-            f.attrs["columns"] = self.part_columns # save the columns name as metadata  
-            f.attrs["ev_size"] = ev_size
-            
-            for idx_event, (idx_start, idx_end) in enumerate(zip(idxs_start, idxs_end)):
-                head_data, part_data = self.get_lines_data(idx_start, idx_end)
-                part_data = np.array(part_data)
-                d_name = str(idx_event)
-
-                # save all the rows but skip the first column since it's the index
-                f.create_dataset(d_name, data=part_data[:,1:])
-
-                # save the header if present
-                if has_headers:
-                    if (len(head_data.shape) > 1):
-                        ValueError(f"More than one header detected in Event #{idx_event}")
-                        
-                    f.create_dataset(d_name + "_header", data=head_data[1:])   
-
-    def to_uproot(self, ev_size, has_headers=False):
-        if not self.file:
-            raise ValueError("File not opened. Call self.open_file() first or enter the context.")
-        
-        file_out_name = str.split(self.file_name, ".")[0] + ".root"
-
-        block_size = ev_size if (not has_headers) else ev_size + 1
-        foo = self.file_rows % block_size
-
-        if foo != 0:
-            raise ValueError("The number of rows in the file is not a multiple of block_size.")
-        
-        n_events = int(self.file_rows / block_size)
-
-        idxs_start = [x * block_size for x in range(n_events)]
-        idxs_end = [x * block_size for x in range(1, n_events+1)]
-
-        if has_headers:
-            # create headers numpy arrays
-            vld_header_array = np.zeros(n_events)
-            err_bit_array    = np.zeros(n_events)
-            lr_num_array     = np.zeros(n_events)
-            orbit_cnt_array  = np.zeros(n_events)
-            bx_cnt_array     = np.zeros(n_events)
-            n_cand_array     = np.zeros(n_events)
-
-        # create particles numpy arrays
-        pts_array     = np.zeros((n_events, ev_size), dtype="int32")
-        etas_array    = np.zeros((n_events, ev_size), dtype="int32")
-        phis_array    = np.zeros((n_events, ev_size), dtype="int32")
-        pdg_ids_array = np.zeros((n_events, ev_size), dtype="int32")
-
-        with uproot.recreate(self.data_path + file_out_name) as f:
-            for idx_event, (idx_start, idx_end) in enumerate(zip(idxs_start, idxs_end)):
-                head_data, part_data = self.get_lines_data(idx_start, idx_end)
-                
-                if has_headers:
-                    if (len(head_data.shape) > 1):
-                        ValueError(f"More than one header detected in Event #{idx_event}")
-
-                    # update headers arrays
-                    vld_header_array[idx_event] = head_data[1]
-                    err_bit_array[idx_event]    = head_data[2]
-                    lr_num_array[idx_event]     = head_data[3]
-                    orbit_cnt_array[idx_event]  = head_data[4]
-                    bx_cnt_array[idx_event]     = head_data[5]
-                    n_cand_array[idx_event]     = head_data[6]
-
-                # update particles arrays
-                pdg_ids_array[idx_event] = part_data[:,1]
-                phis_array[idx_event]    = part_data[:,2]
-                etas_array[idx_event]    = part_data[:,3]
-                pts_array[idx_event]     = part_data[:,4]
-
-            f["Events"] = {"pt":      ak.from_numpy(pts_array), 
-                            "eta":    ak.from_numpy(etas_array), 
-                            "phi":   ak.from_numpy(phis_array), 
-                            "pdg_id": ak.from_numpy(pdg_ids_array)}
-            
-            f["Metadata"] = {"n_events": ak.Array([n_events]), 
-                             "ev_size": ak.Array([ev_size])}
-
-            if has_headers:
-                f["Headers"] = {"vld_header": ak.from_numpy(vld_header_array), 
-                                "err_bit":    ak.from_numpy(err_bit_array), 
-                                "lr_num":     ak.from_numpy(lr_num_array), 
-                                "orbit_cnt":  ak.from_numpy(orbit_cnt_array), 
-                                "bx_cnt":     ak.from_numpy(bx_cnt_array), 
-                                "n_cand":     ak.from_numpy(n_cand_array)}
-
     def _print_table(self, data, column_names):
         columns = len(column_names)
         col_widths = [max(len(str(row[i])) for row in data) for i in range(columns)]
@@ -388,77 +207,23 @@ class PuppiData:
                 eta += 2 ** ii
 
         eta += (-1) * eta_sign * 2 ** (12 - 1)
-        
-        if pid == 0:
-            pdg_id = 130
-
-        elif pid == 1:
-            pdg_id = 22
-
-        elif pid == 2:
-            pdg_id = -211
-
-        elif pid == 3:
-            pdg_id = 211
-
-        elif pid == 4:
-            pdg_id = 11
-
-        elif pid == 5:
-            pdg_id = -11
-
-        elif pid == 6:
-            pdg_id = 6
-
-        elif pid == 7:
-            pdg_id = -13
-
-        else:
-            pdg_id = "ERR"
 
         return {
-            "pdg_id": pdg_id, 
+            "pid": pid, 
             "phi": phi, 
             "eta": eta, 
             "pt": pt
         }
     
-    def _get_raw_pdgid(self, pdg_id):
-        if pdg_id == 130:
-            return 0
-    
-        elif pdg_id == 22:
-            return 1
-
-        elif pdg_id == -211:
-            return 2
-        
-        elif pdg_id == 211:
-            return 3
-        
-        elif pdg_id == 11:
-            return 4
-        
-        elif pdg_id == -11:
-            return 5
-        
-        elif pdg_id == 13:
-            return 6
-
-        elif pdg_id == -13:
-            return 7
-        
-        else:
-            return "ERR"
-    
 if __name__ == "__main__":
-    # file = "Puppi.dump"
+    # file = "puppi_SingleNeutrino_PU200.125X_v1.0.dump"
+    file = "puppi_SingleNeutrino_PU200.125X_v1.0.224.dump"
+    # file = "puppi_WTo3Pion_PU200.dump"
     # file = "Puppi_224.dump"
     # file = "Puppi_104_nh.dump"
     # file = "Puppi_208_nh.dump"
     # file = "puppi_WTo3Pion_PU200.dump"
-    file = "PuppiSignal_224.dump"
+    # file = "PuppiSignal_224.dump"
     with PuppiData(file) as myPuppi:
-        myPuppi.print_lines_data(2364096, 2364320)
-        # myPuppi.print_lines_data(224, 448)
-        # myPuppi.print_lines_data(448, 672)
+        # myPuppi.print_lines_data(0, 227)
+        print(myPuppi.file_rows / 224)
