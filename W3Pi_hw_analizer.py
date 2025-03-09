@@ -1,7 +1,6 @@
 import config
 import numpy as np
 import h5py
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import mplhep as hep
@@ -22,13 +21,15 @@ hwreco_events = []
 hwreco_acc_events = []
 hwreco_good_matched_events = []
 
-hwreco_acc_masses = []
 hwreco_good_matched_masses = []
 
 num_orbits = 14
 num_events = 3564
 num_tot_events = num_events * num_orbits
 evt_list = np.arange(num_tot_events)
+
+print("SIGNAL DATASET ANALYSIS")
+print("\n")
 
 with h5py.File(config.DATA + "/l1Nano_WTo3Pion_PU200.hdf5", "r") as f_gm:
     with h5py.File(config.RESULTS + "/l1Nano_WTo3Pion_PU200_hwreco_fulldata.hdf5", "r") as f_hwreco:
@@ -61,11 +62,6 @@ with h5py.File(config.DATA + "/l1Nano_WTo3Pion_PU200.hdf5", "r") as f_gm:
             # count the number of reconstructed triplets that are within acceptance (or not)
             if grp_gm.attrs["is_acc"] == 1:
                 hwreco_acc_events.append(int(grp_name_gm))
-
-                # save the reco mass: this is key because when we reconstruct something 
-                # with our algorithm, this in reality can occur only with the particles
-                # that fall in the acceptance region of the detector
-                hwreco_acc_masses.append(grp_hwreco["hwreco_w_mass"][...].item())
             
             # count the number of reconstructed events in which there is a good triplet reconstructed correctly
             if grp_gm.attrs["is_good"] == 1:
@@ -118,19 +114,35 @@ print(f"Events within acceptance: {n_acc} ({(n_acc / num_tot_events) * 100:.2f} 
 print(f"Events with a matched triplet: {n_match} ({(n_match / num_tot_events) * 100:.2f} % of total, {(n_match / n_acc) * 100:.2f} % of acc)")
 print(f"Events with a good triplet: {n_good} ({(n_good / num_tot_events) * 100:.2f} % of total, {(n_good / n_acc) * 100:.2f} % of acc)")
 print("\n")
-print("Total number of reconstructed events: ", n_hwreco)
-print("Reconstructed events within acceptance: ", n_hwreco_acc)
-print("Reconstructed events with a correct good triplet: ", n_hwreco_good_matched)
+print(f"Total number of reconstructed events: {n_hwreco} ({(n_hwreco / num_tot_events) * 100:.2f} % of total, {(n_hwreco / n_acc) * 100:.2f} % of acc)")
+print(f"Reconstructed events within acceptance: {n_hwreco_acc} ({(n_hwreco_acc / num_tot_events) * 100:.2f} % of total, {(n_hwreco_acc / n_acc) * 100:.2f} % of acc)")
+print(f"Reconstructed events with a correct good triplet: {n_hwreco_good_matched} ({(n_hwreco_good_matched / num_tot_events) * 100:.2f} % of total, {(n_hwreco_good_matched / n_acc) * 100:.2f} % of acc)")
 
 nbins = 40
 binarray = np.linspace(60, 100, nbins, dtype=np.float32)
 
-plt.figure()
+plt.figure(figsize=(12, 10))
 plt.hist(good_matched_masses, bins=binarray, label="Generated", histtype='step', linestyle="-", lw=3)
-plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 Puppi Reco (VCK5000)", histtype='step', linestyle="-", lw=3)
+plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 Puppi Reco", histtype='step', linestyle="-", lw=3)
 hep.cms.label(label="Phase-2 Simulation Preliminary", data=True, rlabel="PU 200 (14 TeV)", fontsize=20);
 plt.xlabel(r"$m_{3\pi}$ (GeV)")
 plt.ylabel(f"Events")
 plt.legend(fontsize="16", title=r"$W\to3\pi$")
 plt.tight_layout()
 plt.savefig(config.FIGURES + "/hist.png")
+
+print("\n")
+print("BACKGROUND DATASET ANALYSIS")
+print("\n")
+
+n_hwreco_bkg = 0
+
+with h5py.File(config.RESULTS + "/l1Nano_SingleNeutrino_PU200_hwreco_fulldata.hdf5", "r") as f_hwreco:
+    for (grp_name_hwreco, grp_hwreco) in tqdm(f_hwreco.items()):
+        if np.allclose(grp_hwreco["hwreco_triplet_idxs"], [0, 0, 0]):
+            continue
+
+        n_hwreco_bkg += 1
+
+print("Total number of events: ", num_tot_events)
+print(f"Total number of reconstructed events: {n_hwreco_bkg} ({(n_hwreco_bkg / num_tot_events) * 100:.2f} % of total)")

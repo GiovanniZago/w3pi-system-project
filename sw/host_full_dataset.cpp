@@ -34,7 +34,7 @@ int main(int argc, char* argv[])
 
 	for (unsigned int idx_orbit = 0; idx_orbit < NUM_ORBITS; idx_orbit++)
 	{
-		std::cout << "------------- Processing Orbit: " << idx_orbit << " Start Evt Index: " << start_event_idx << " -------------" << std::endl;
+		std::cout << "------------- Processing Orbit: " << idx_orbit << " -------------" << std::endl;
 
 		std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/puppi_SingleNeutrino_PU200.125X_v1.0.224.dump", std::ios::binary);
 

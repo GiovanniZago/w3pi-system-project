@@ -15,23 +15,15 @@
 // #define __x86ANGSEPDEBUG__
 
 static const int16 N_MIN = 16;
-static const int16 PT_MSB = 13;
-static const int16 ETA_MSB = 11;
-static const int16 PHI_SHIFT_L = 26;
-static const int16 PHI_MSB_L = 5;
-static const int16 PHI_MSB_H = 4;
-static const int16 PHI_MSB = 10;
-static const int16 PDG_ID_SHIFT = 5;
-static const int16 PDG_ID_MSB = 2;
-static const int16 MIN_PT = 28; // 12 GeV
-static const int16 MED_PT = 48; // 15 GeV
-static const int16 HIG_PT = 60; // 18 GeV tighter cuts
+static const int16 MIN_PT = 28; // (7  Gev) looser cuts; 48 (12 GeV) tighter cuts for offline reconstruction
+static const int16 MED_PT = 48; // (12 Gev) looser cuts; 60 (15 GeV) tighter cuts for offline reconstruction
+static const int16 HIG_PT = 60; // (15 Gev) looser cuts; 72 (18 GeV) tighter cuts for offline reconstruction
 static const int16 PI = 720;
 static const int16 MPI = -720;
 static const int16 TWOPI = 1440;
 static const int16 MTWOPI = -1440;
-static const float MIN_MASS = 60.0; // 40
-static const float MAX_MASS = 100.0; // 150
+static const float MIN_MASS = 60.0; 
+static const float MAX_MASS = 100.0; 
 static const float MINDR2_FLOAT = 0.01 * 0.01;
 static const float MAXDR2_FLOAT = 0.25 * 0.25;
 static const float MINDR2_ANGSEP_FLOAT = 0.5 * 0.5;

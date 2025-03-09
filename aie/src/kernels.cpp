@@ -13,7 +13,7 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     aie::vector<int16, V_SIZE> pdg_ids[P_BUNCHES] = { aie::broadcast<int16, V_SIZE>(0) };
 
     // filter pt and pdg id
-    aie::mask<V_SIZE> is_min_pt[P_BUNCHES], is_med_pt[P_BUNCHES], is_hig_pt[P_BUNCHES], is_pdg_id[P_BUNCHES];
+    aie::mask<V_SIZE> is_min_pt, is_med_pt, is_hig_pt;
     int16 min_pt_counter = 0, med_pt_counter = 0, hig_pt_counter = 0;
     aie::vector<int16, N_MIN> is_filter = aie::broadcast<int16, N_MIN>(0);
 
@@ -24,12 +24,12 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
     chess_prepare_for_pipelining
     {
         pts[i].insert(0, readincr_v<V_SIZE>(in0));
-        is_min_pt[i] = aie::ge(pts[i], MIN_PT);
-        is_med_pt[i] = aie::ge(pts[i], MED_PT);
-        is_hig_pt[i] = aie::ge(pts[i], HIG_PT);
-        min_pt_counter += is_min_pt[i].count();
-        med_pt_counter += is_med_pt[i].count();
-        hig_pt_counter += is_hig_pt[i].count();
+        is_min_pt = aie::ge(pts[i], MIN_PT);
+        is_med_pt = aie::ge(pts[i], MED_PT);
+        is_hig_pt = aie::ge(pts[i], HIG_PT);
+        min_pt_counter += is_min_pt.count();
+        med_pt_counter += is_med_pt.count();
+        hig_pt_counter += is_hig_pt.count();
 
         etas[i].insert(0, readincr_v<V_SIZE>(in1));
     }
@@ -98,8 +98,8 @@ void w3pi(input_stream<int16> * __restrict in0, input_stream<int16> * __restrict
             d_eta = aie::sub(etas[out_idx][in_idx], etas[k]);
 
             d_phi = aie::sub(phis[out_idx][in_idx], phis[k]);
-            d_phi_ptwopi = aie::add(d_phi, twopi_vector); // d_eta + 2 * pi
-            d_phi_mtwopi = aie::add(d_phi, mtwopi_vector); // d_eta - 2 * pi
+            d_phi_ptwopi = aie::add(d_phi, twopi_vector); // d_phi + 2 * pi
+            d_phi_mtwopi = aie::add(d_phi, mtwopi_vector); // d_phi - 2 * pi
             is_gt_pi = aie::gt(d_phi, pi_vector);
             is_lt_mpi = aie::lt(d_phi, mpi_vector);
             d_phi = aie::select(d_phi, d_phi_ptwopi, is_lt_mpi); // select element from d_phi if element is geq of -pi, otherwise from d_phi_ptwopi
