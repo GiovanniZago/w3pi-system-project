@@ -109,6 +109,7 @@ n_hwreco = len(hwreco_events)
 n_hwreco_acc = len(hwreco_acc_events)
 n_hwreco_good_matched = len(hwreco_good_matched_events)
 
+
 print("Total number of events: ", num_tot_events)
 print(f"Events within acceptance: {n_acc} ({(n_acc / num_tot_events) * 100:.2f} % of total)")
 print(f"Events with a matched triplet: {n_match} ({(n_match / num_tot_events) * 100:.2f} % of total, {(n_match / n_acc) * 100:.2f} % of acc)")
@@ -118,12 +119,17 @@ print(f"Total number of reconstructed events: {n_hwreco} ({(n_hwreco / num_tot_e
 print(f"Reconstructed events within acceptance: {n_hwreco_acc} ({(n_hwreco_acc / num_tot_events) * 100:.2f} % of total, {(n_hwreco_acc / n_acc) * 100:.2f} % of acc)")
 print(f"Reconstructed events with a correct good triplet: {n_hwreco_good_matched} ({(n_hwreco_good_matched / num_tot_events) * 100:.2f} % of total, {(n_hwreco_good_matched / n_acc) * 100:.2f} % of acc)")
 
+# retrieve offline selection results
+offreco_good_matched_masses = np.loadtxt(config.RESULTS + "/l1Nano_WTo3Pion_PU200_offreco_fulldata.csv", delimiter=",")
+good_matched_masses_gp = np.loadtxt(config.RESULTS + "/m3pi_gen_values.csv", delimiter=",")
+
 nbins = 40
 binarray = np.linspace(60, 100, nbins, dtype=np.float32)
 
 plt.figure(figsize=(12, 10))
-plt.hist(good_matched_masses, bins=binarray, label="Generated", histtype='step', linestyle="-", lw=3)
-plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 Puppi Reco", histtype='step', linestyle="-", lw=3)
+plt.hist(good_matched_masses_gp, bins=binarray, label="Generated", histtype='step', linestyle="-", lw=3)
+plt.hist(offreco_good_matched_masses, bins=binarray, label="Offline L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
+plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 hep.cms.label(label="Phase-2 Simulation Preliminary", data=True, rlabel="PU 200 (14 TeV)", fontsize=20);
 plt.xlabel(r"$m_{3\pi}$ (GeV)")
 plt.ylabel(f"Events")
