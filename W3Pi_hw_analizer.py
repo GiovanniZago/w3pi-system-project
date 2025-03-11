@@ -137,6 +137,7 @@ n2, bins2, patches2 = plt.hist(offreco_good_matched_masses, bins=binarray, label
 n3, bins3, patches3 = plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 plt.xlabel(r"$m_{3\pi}$ (GeV)")
 plt.ylabel(f"Events")
+plt.xlim((60, 100))
 
 ax = plt.gca()
 
