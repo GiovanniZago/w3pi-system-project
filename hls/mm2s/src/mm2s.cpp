@@ -9,7 +9,7 @@ void mm2s(ap_int<64 * BLOCK_SIZE>* mem, hls::stream<qdma_axis<32,0,0,0>>& s0, hl
 	#pragma HLS INTERFACE axis port=s1
 
 	#pragma HLS INTERFACE s_axilite port=mem bundle=control
-	#pragma HLS interface s_axilite port=return bundle=control
+	#pragma HLS INTERFACE s_axilite port=return bundle=control
 	
 	ap_uint<32> mem_offset = 0;
 

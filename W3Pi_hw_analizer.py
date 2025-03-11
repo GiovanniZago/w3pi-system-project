@@ -2,6 +2,7 @@ import config
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+from matplotlib.legend_handler import HandlerTuple
 from tqdm import tqdm
 import mplhep as hep
 
@@ -120,20 +121,47 @@ print(f"Reconstructed events within acceptance: {n_hwreco_acc} ({(n_hwreco_acc /
 print(f"Reconstructed events with a correct good triplet: {n_hwreco_good_matched} ({(n_hwreco_good_matched / num_tot_events) * 100:.2f} % of total, {(n_hwreco_good_matched / n_acc) * 100:.2f} % of acc)")
 
 # retrieve offline selection results
-offreco_good_matched_masses = np.loadtxt(config.RESULTS + "/l1Nano_WTo3Pion_PU200_offreco_fulldata.csv", delimiter=",")
 good_matched_masses_gp = np.loadtxt(config.RESULTS + "/m3pi_gen_values.csv", delimiter=",")
+n_good_matched_masses_gp = len(good_matched_masses_gp)
+
+offreco_good_matched_masses = np.loadtxt(config.RESULTS + "/l1Nano_WTo3Pion_PU200_offreco_fulldata.csv", delimiter=",")
+n_offreco_good_matched = len(offreco_good_matched_masses)
 
 nbins = 40
 binarray = np.linspace(60, 100, nbins, dtype=np.float32)
 
 plt.figure(figsize=(12, 10))
-plt.hist(good_matched_masses_gp, bins=binarray, label="Generated", histtype='step', linestyle="-", lw=3)
-plt.hist(offreco_good_matched_masses, bins=binarray, label="Offline L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
-plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 hep.cms.label(label="Phase-2 Simulation Preliminary", data=True, rlabel="PU 200 (14 TeV)", fontsize=20);
+n1, bins1, patches1 = plt.hist(good_matched_masses_gp, bins=binarray, label="Generated matching Offline Reco", histtype='step', linestyle="-", lw=3)
+n2, bins2, patches2 = plt.hist(offreco_good_matched_masses, bins=binarray, label="Offline L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
+n3, bins3, patches3 = plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 plt.xlabel(r"$m_{3\pi}$ (GeV)")
 plt.ylabel(f"Events")
-plt.legend(fontsize="16", title=r"$W\to3\pi$")
+
+ax = plt.gca()
+
+# main legend
+main_legend = ax.legend(title=r"$W\to3\pi$", loc="upper left", fontsize=16)
+
+# side legend
+side_labels = [
+    f"{n_offreco_good_matched} ({(n_offreco_good_matched / num_tot_events) * 100:.2f} %)",
+    f"{n_hwreco_good_matched} ({(n_hwreco_good_matched / num_tot_events) * 100:.2f} %)"    
+]
+side_handles = [(patches1[0], patches2[0]), patches3[0]]
+side_legend = ax.legend(handles=side_handles,\
+                        labels=side_labels,\
+                        handler_map={tuple: HandlerTuple(ndivide=None)},\
+                        title=r"$N_{events}=$" + f"{num_tot_events}",\
+                        title_fontsize="small",\
+                        loc="upper right",\
+                        columnspacing=0.5,\
+                        handletextpad=0.5,\
+                        fontsize=16)
+
+# force displaying the main legend
+ax.add_artist(main_legend)
+
 plt.tight_layout()
 plt.savefig(config.FIGURES + "/hist.png")
 
