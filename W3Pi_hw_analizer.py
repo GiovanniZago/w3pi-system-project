@@ -132,8 +132,8 @@ binarray = np.linspace(60, 100, nbins, dtype=np.float32)
 
 plt.figure(figsize=(12, 10))
 hep.cms.label(label="Phase-2 Simulation Preliminary", data=True, rlabel="PU 200 (14 TeV)", fontsize=20);
-n1, bins1, patches1 = plt.hist(good_matched_masses_gp, bins=binarray, label="Generated matching Offline Reco", histtype='step', linestyle="-", lw=3)
-n2, bins2, patches2 = plt.hist(offreco_good_matched_masses, bins=binarray, label="Offline L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
+n1, bins1, patches1 = plt.hist(good_matched_masses_gp, bins=binarray, label="Generated matching Software Reco", histtype='step', linestyle="-", lw=3)
+n2, bins2, patches2 = plt.hist(offreco_good_matched_masses, bins=binarray, label="Software L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 n3, bins3, patches3 = plt.hist(hwreco_good_matched_masses, bins=binarray, label="AIE L1 PUPPI Reco", histtype='step', linestyle="-", lw=3)
 plt.xlabel(r"$m_{3\pi}$ (GeV)")
 plt.ylabel(f"Events")

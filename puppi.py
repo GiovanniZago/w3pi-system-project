@@ -217,9 +217,10 @@ class PuppiData:
     
 if __name__ == "__main__":
     # file = "puppi_SingleNeutrino_PU200.125X_v1.0.dump"
-    file = "puppi_SingleNeutrino_PU200.125X_v1.0.224.dump"
+    # file = "puppi_SingleNeutrino_PU200.125X_v1.0.224.dump"
     # file = "puppi_WTo3Pion_PU200.dump"
-    # file = "Puppi_224.dump"
+    file = "Puppi_224.dump"
+    # file = "Puppi.dump"
     # file = "Puppi_104_nh.dump"
     # file = "Puppi_208_nh.dump"
     # file = "puppi_WTo3Pion_PU200.dump"

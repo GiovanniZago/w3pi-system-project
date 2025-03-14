@@ -311,8 +311,8 @@ if __name__ == "__main__":
     # aie_compile_x86(env)
     # run_x86_simulator(env)
 
-    # aie_compile_hw(env)
-    # run_aiesimulator(env)
+    aie_compile_hw(env)
+    run_aiesimulator(env)
 
     # hls_compile(env, "mm2s")
     # hls_compile(env, "s2mm")
@@ -321,8 +321,8 @@ if __name__ == "__main__":
 
     # package_system(env)
 
-    sw_compile(env)
+    # sw_compile(env)
 
     # run_hw_emu(env)
 
-    run_hw(env)
+    # run_hw(env)

@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 	checkpoint("BUFFER_OBJECT", DEBUG);
 
 	// open out file in append mode
-	std::ofstream out_file("/home/giovanni/w3pi-system-project/results/l1Nano_SingleNeutrino_PU200_hwreco_fulldata.csv", std::ios::app);
+	std::ofstream out_file("/home/giovanni/w3pi-system-project/results/foo.csv", std::ios::app);
 
 	if (!out_file) 
     {
@@ -36,8 +36,8 @@ int main(int argc, char* argv[])
 	{
 		std::cout << "------------- Processing Orbit: " << idx_orbit << " -------------" << std::endl;
 
-		// std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
-		std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/puppi_SingleNeutrino_PU200.125X_v1.0.224.dump", std::ios::binary);
+		std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/PuppiSignal_224.dump", std::ios::binary);
+		// std::ifstream bin_file("/home/giovanni/w3pi-system-project/data/puppi_SingleNeutrino_PU200.125X_v1.0.224.dump", std::ios::binary);
 
 		if (!bin_file) 
 		{
@@ -95,9 +95,9 @@ int main(int argc, char* argv[])
 	
 		if (PRINT_TIME)
 		{
-			std::cout << "Allocation time: " << dt_allocate << " ms" << std::endl;
-			std::cout << "Execuion time: " << dt_exec << " ms" << std::endl;
-			std::cout << "Readout time: " << dt_readout << " ms" << std::endl;
+			std::cout << "Allocation time: " << std::setprecision(3) <<  dt_allocate << " ms" << std::endl;
+			std::cout << "Execuion time: " << std::setprecision(3) << dt_exec << " ms" << std::endl;
+			std::cout << "Readout time: " << std::setprecision(3) << dt_readout << " ms" << std::endl;
 		}
 
 		start_event_idx += NUM_EVENTS;

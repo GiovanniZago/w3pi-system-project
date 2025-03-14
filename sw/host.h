@@ -3,6 +3,7 @@
 #include <iostream>
 #include <chrono>
 #include <unordered_map>
+#include <iomanip>
 
 #include "ap_int.h"
 #include "experimental/xrt_kernel.h"
